@@ -1,0 +1,10 @@
+COLS = ["LIT101", "FIT101", "MV101", "P101", "P102"]
+channel_num = len(COLS)
+window_size = 60
+device = "cuda"
+stage1_batch_size = 2
+stage2_batch_size = 4
+epoch_num = 5
+stage1_lr = 1e-3
+stage2_lr = 1e-3
+weight_decay = 0.01
