@@ -1,2 +1,6 @@
 /data/SWaT
 /data/SWaT_split
+/data/SWaT_processed
+/model/customGPT
+__pycache__/
+*.py[cod]

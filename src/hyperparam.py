@@ -1,10 +1,23 @@
-COLS = ["LIT101", "FIT101", "MV101", "P101", "P102"]
-channel_num = len(COLS)
-window_size = 60
+data_window_size = 90
+data_stride = 15
+data_len = 60
+normal_data_cut = 10
+attack_data_cut = 1
+
+epoch_num = 50
+train_epoch_num = 1
+
+cpu_num = 4
 device = "cuda"
-stage1_batch_size = 2
-stage2_batch_size = 4
-epoch_num = 5
-stage1_lr = 1e-3
-stage2_lr = 1e-3
-weight_decay = 0.01
+batch_size = 8
+lr = 1e-3
+weight_decay = 1e-5
+use_amp = True
+d_model = 256
+n_heads = 4
+n_layers = 4
+dropout = 0.1
+pooling_layer_num = 7
+slide_len = 5
+masking_len = 5
+tau = 0.2
