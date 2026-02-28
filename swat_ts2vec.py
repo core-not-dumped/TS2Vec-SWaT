@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from tqdm import tqdm
 
 from model.customGPT import *
@@ -5,6 +7,11 @@ from model.loss import *
 from data.dataset import *
 from data.augmentation import *
 from src.hyperparam import *
+
+def write_and_print(f, msg):
+    print(msg)
+    f.write(msg + "\n")
+    f.flush()
 
 data_loader_general_hyperparam = {
     "batch_size": batch_size,
@@ -61,11 +68,6 @@ for epoch in range(epoch_num):
             losses.append(loss.item())
         print(f"Epoch {epoch} - Loss: {np.mean(losses)}")
 
-    def summarize_scores(name, scores):
-        print(f"[{name}] n={len(scores)}  mean={scores.mean():.4f}  "
-            f"std={scores.std():.4f}  p50={np.percentile(scores,50):.4f}  "
-            f"p90={np.percentile(scores,90):.4f}  p99={np.percentile(scores,99):.4f}")
-
     with torch.no_grad():
         print("Evaluating...")
         # centroid는 normal_train
@@ -98,23 +100,33 @@ for epoch in range(epoch_num):
         )
         '''
 
-        summarize_scores("normal_test", scores_n)
-        summarize_scores("attack_test", scores_a)
+        def summarize_scores(name, scores, f):
+            msg = (
+                f"[{name}] n={len(scores)}  "
+                f"mean={scores.mean():.4f}  "
+                f"std={scores.std():.4f}  "
+                f"p50={np.percentile(scores,50):.4f}  "
+                f"p90={np.percentile(scores,90):.4f}  "
+                f"p99={np.percentile(scores,99):.4f}"
+            )
+            write_and_print(f, msg)
 
-        # 합쳐서 AUROC/PR
-        try:
+        with open("./results.txt", "a") as f:
+            write_and_print(f, f"Epoch {epoch}  |  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            summarize_scores("normal_test", scores_n, f)
+            summarize_scores("attack_test", scores_a, f)
+
+            # 합쳐서 AUROC/PR
             from sklearn.metrics import roc_auc_score, average_precision_score
             scores_all = np.concatenate([scores_n, scores_a])
             labels_all = np.concatenate([labels_n, labels_a])  # attack=1이어야 함
-            print("AUROC:", roc_auc_score(labels_all, scores_all))
-            print("AUPRC:", average_precision_score(labels_all, scores_all))
-        except Exception as e:
-            print("sklearn metrics 계산 실패:", e)
+            write_and_print(f, f"AUROC: {roc_auc_score(labels_all, scores_all):.6f}")
+            write_and_print(f, f"AUPRC: {average_precision_score(labels_all, scores_all):.6f}")
 
-        # threshold 예시: normal_train(or normal_test)의 99%를 임계값으로
-        thr = np.percentile(scores_n, 99)
-        print("threshold(p99 of normal_test):", thr)
-        print("attack detection rate @thr:", (scores_a > thr).mean())
-        print("false positive rate @thr:", (scores_n > thr).mean())
+            # threshold 예시: normal_train(or normal_test)의 99%를 임계값으로
+            thr = np.percentile(scores_n, 99)
+            write_and_print(f, f"threshold(p99 of normal_test): {thr:.6f}")
+            write_and_print(f, f"attack detection rate @thr: {(scores_a > thr).mean():.6f}")
+            write_and_print(f, f"false positive rate @thr: {(scores_n > thr).mean():.6f}")
 
-        torch.save(model.state_dict(), f"./model/customGPT/{epoch}.pt")
+            torch.save(model.state_dict(), f"./model/customGPT/{epoch}.pt")
