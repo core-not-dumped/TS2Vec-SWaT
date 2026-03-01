@@ -20,6 +20,19 @@ class _DilatedConvBlock(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.ln = nn.LayerNorm(d_model)
 
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        # Conv1d: Kaiming init (for GELU)
+        nn.init.kaiming_normal_(self.conv.weight, nonlinearity="relu")
+        self.conv.weight.data *= 0.1          # 🔥 residual 안정화 (중요)
+        if self.conv.bias is not None:
+            nn.init.zeros_(self.conv.bias)
+
+        # LayerNorm
+        nn.init.ones_(self.ln.weight)
+        nn.init.zeros_(self.ln.bias)
+
     def _pad(self, x_ct: torch.Tensor) -> torch.Tensor:
         # x_ct: (B, C, T)
         # padding needed to preserve length

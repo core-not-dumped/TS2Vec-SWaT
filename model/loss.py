@@ -6,7 +6,7 @@ import numpy as np
 from data.augmentation import *
 from src.hyperparam import *
 
-def ts2vec_dual_loss_vec(z1: torch.Tensor, z2: torch.Tensor, tau: float = 0.2) -> torch.Tensor:
+def ts2vec_dual_loss_vec(z1: torch.Tensor, z2: torch.Tensor) -> torch.Tensor:
     B, D, L = z1.shape
     device = z1.device
 
@@ -15,11 +15,11 @@ def ts2vec_dual_loss_vec(z1: torch.Tensor, z2: torch.Tensor, tau: float = 0.2) -
 
     # -------------------------
     # Instance-wise (batch 끼리 비교)
-    # logits_ab_inst: (L,B,B) = a[i,t]·b[j,t] / tau
-    # logits_aa_inst: (L,B,B) = a[i,t]·a[j,t] / tau
+    # logits_ab_inst: (L,B,B) = a[i,t]·b[j,t]
+    # logits_aa_inst: (L,B,B) = a[i,t]·a[j,t]
     # -------------------------
-    logits_ab_inst = torch.einsum("itd,jtd->tij", a, b) / tau
-    logits_aa_inst = torch.einsum("itd,jtd->tij", a, a) / tau
+    logits_ab_inst = torch.einsum("itd,jtd->tij", a, b)
+    logits_aa_inst = torch.einsum("itd,jtd->tij", a, a)
 
     # numerator log: diag over (i==j)
     log_num_inst = logits_ab_inst.diagonal(dim1=1, dim2=2)  # (L,B)
@@ -40,11 +40,11 @@ def ts2vec_dual_loss_vec(z1: torch.Tensor, z2: torch.Tensor, tau: float = 0.2) -
 
     # -------------------------
     # Temporal (time step 끼리 비교)
-    # logits_ab_temp: (B,L,L) = a[i,t]·b[i,t'] / tau
-    # logits_aa_temp: (B,L,L) = a[i,t]·a[i,t'] / tau
+    # logits_ab_temp: (B,L,L) = a[i,t]·b[i,t']
+    # logits_aa_temp: (B,L,L) = a[i,t]·a[i,t']
     # -------------------------
-    logits_ab_temp = torch.einsum("itd,isd->its", a, b) / tau  # (B,L,L)
-    logits_aa_temp = torch.einsum("itd,isd->its", a, a) / tau  # (B,L,L)
+    logits_ab_temp = torch.einsum("itd,isd->its", a, b)  # (B,L,L)
+    logits_aa_temp = torch.einsum("itd,isd->its", a, a)  # (B,L,L)
 
     log_num_temp = logits_ab_temp.diagonal(dim1=1, dim2=2)  # (B,L)
 
@@ -61,9 +61,9 @@ def ts2vec_dual_loss_vec(z1: torch.Tensor, z2: torch.Tensor, tau: float = 0.2) -
     return loss_temp + loss_inst
 
 
-def hier_loss_ts2vec_dual(outs1, outs2, tau=0.2):
+def hier_loss_ts2vec_dual(outs1, outs2):
     return sum(
-        ts2vec_dual_loss_vec(o1, o2, tau)
+        ts2vec_dual_loss_vec(o1, o2)
         for o1, o2 in zip(outs1, outs2)
     )
 
@@ -126,16 +126,14 @@ def last_repr_from_model(model, pooling_layer, x):
 
 @torch.no_grad()
 def score_by_masking(model, proj_layer, pooling_layer, loader, device, masking_len, progress=1.0):
-    model.eval()
-    proj_layer.eval()
-    scores = []
-    labels = []
+    model.eval(); proj_layer.eval()
+    scores, labels = [], []
     max_steps = int(len(loader) * progress)
 
     for step, (x, y, ts) in enumerate(tqdm(loader, total=max_steps)):
         if step >= max_steps:   break
         x = x.to(device)  # (B, C, T)
-        x_mask = augment_view_return1(x, data_len) # (B, data_len, C)
+        x = augment_view_return1(x, data_len) # (B, data_len, C)
         y_np = y.detach().cpu().numpy()
 
         # input projection
@@ -143,9 +141,9 @@ def score_by_masking(model, proj_layer, pooling_layer, loader, device, masking_l
         x_mask = augment_view_return_masking(x, data_len, masking_len) # (B * masking_len, data_len, d_model)
 
         # unmasked
-        r = last_repr_from_model(model, pooling_layer, x) # (B, D)
-        r_mask = last_repr_from_model(model, pooling_layer, x_mask) # (B * masking_len, D)
-        r_mask = r_mask.reshape(-1, masking_len, r_mask.size(-1))  # (B, masking_len, D)
+        r = last_repr_from_model(model, pooling_layer, x) # (B, d_model)
+        r_mask = last_repr_from_model(model, pooling_layer, x_mask) # (B * masking_len, d_model)
+        r_mask = r_mask.reshape(-1, masking_len, r_mask.size(-1))  # (B, masking_len, d_model)
 
         # compute similarity between r and each masked version of r
         s = (r.unsqueeze(1) - r_mask).abs().sum(dim=-1)  # (B, masking_len)
@@ -157,3 +155,85 @@ def score_by_masking(model, proj_layer, pooling_layer, loader, device, masking_l
     scores = np.concatenate(scores, axis=0)
     labels = np.concatenate(labels, axis=0)
     return scores, labels
+
+
+def repr_at_t_multiscale(model, pooling_layer, x, t_idx: torch.Tensor):
+    out = model(x)
+    outs = pooling_layer(out)  # list of (B, D, T_s)
+
+    hs = []
+    valids = []
+    B = t_idx.size(0)
+    device = t_idx.device
+
+    for s, o in enumerate(outs):
+        # o: (B, D, T_s)
+        T_s = o.size(-1)
+        ts = torch.div(t_idx, 2 ** s, rounding_mode="floor")  # (B,)
+        valid = (ts >= 0) & (ts < T_s)                         # (B,)
+
+        # gather: (B, D)
+        # clamp는 gather 에러 방지용(어차피 valid로 마스킹)
+        ts_clamped = ts.clamp(0, T_s - 1)
+        h = o.gather(dim=2, index=ts_clamped.view(B, 1, 1).expand(B, o.size(1), 1)).squeeze(-1)
+
+        hs.append(h)
+        valids.append(valid)
+
+    return hs, valids
+
+
+def multiscale_l1_at_t(hs_u, hs_m, valids):
+    B = hs_u[0].size(0)
+    device = hs_u[0].device
+    s = torch.zeros(B, device=device)
+    cnt = torch.zeros(B, device=device)
+
+    for hu, hm, v in zip(hs_u, hs_m, valids):
+        d = (hu - hm).abs().sum(dim=-1)         # (B,)
+        s = s + d * v.float()
+        cnt = cnt + v.float()
+
+    s = s / cnt.clamp_min(1.0)
+    return s
+
+
+@torch.no_grad()
+def score_by_masking_indexed(
+    model, proj_layer, pooling_layer, loader, device, masking_len, progress=1.0
+):
+    model.eval(); proj_layer.eval()
+    scores, labels = [], []
+    max_steps = int(len(loader) * progress)
+
+    for step, (x, y, ts) in enumerate(tqdm(loader, total=max_steps)):
+        if step >= max_steps: break
+        x = x.to(device)                    # (B, C, T)
+        x = augment_view_return1(x, data_len) # (B, data_len, C)
+        y_np = y.detach().cpu().numpy()
+
+        x = proj_layer(x)                   # (B, T, D_model)  <- 네 프로젝트 출력이 이 형태라고 가정
+        x_mask = augment_view_return_masking(x, data_len, masking_len)  # (B*masking_len, T, D_model)
+
+        B, T, _ = x.shape
+        per_k = []
+        for k in range(masking_len):
+            t_idx = torch.full((B,), (T - 1 - k), device=device, dtype=torch.long)
+
+            # unmasked repr at that t
+            hs_u, valids = repr_at_t_multiscale(model, pooling_layer, x, t_idx)
+
+            # masked batch에서 k번째 마스크에 해당하는 샘플들만 선택:
+            # x_mask가 (B*masking_len, ...)에서 "각 샘플당 masking_len개"가 연속으로 붙어있다고 가정하면
+            x_m_k = x_mask[k::masking_len]   # (B, T, D_model)
+
+            hs_m, _ = repr_at_t_multiscale(model, pooling_layer, x_m_k, t_idx)
+
+            s_k = multiscale_l1_at_t(hs_u, hs_m, valids)  # (B,)
+            per_k.append(s_k)
+
+        s = torch.stack(per_k, dim=1).mean(dim=1)  # (B,)
+        scores.append(s.detach().cpu().numpy())
+        labels.append(y_np)
+
+    return np.concatenate(scores), np.concatenate(labels)

@@ -38,8 +38,9 @@ cfg = customGPTConfig(
     dropout=dropout
 )
 proj_layer = InputProjection(channel_num, d_model).to(device)
-model = CustomGPT(cfg).to(device)
+# model = CustomGPT(cfg).to(device)
 # model = CustomLSTM(d_model=d_model, n_layers=2, dropout=dropout).to(device)
+model = CustomDilatedCNN(d_model=d_model, n_layers=4, kernel_size=3, dropout=dropout).to(device)
 pooling_layer = TS2VecMaxPooling(pooling_layer_num).to(device)
 optimizers = torch.optim.Adam(list(model.parameters()) + list(proj_layer.parameters()), lr=lr, weight_decay=weight_decay)
 criterion = hier_loss_ts2vec_dual
@@ -83,7 +84,7 @@ for epoch in range(epoch_num):
             outs2 = pooling_layer(out2)
 
             # loss backward
-            loss = criterion(outs1, outs2, tau)
+            loss = criterion(outs1, outs2)
             optimizers.zero_grad()
             loss.backward()
             optimizers.step()
@@ -150,6 +151,8 @@ for epoch in range(epoch_num):
                 f"[{name}] n={len(scores)}  "
                 f"mean={scores.mean():.4f}  "
                 f"std={scores.std():.4f}  "
+                f"p1={np.percentile(scores,1):.4f}  "
+                f"p10={np.percentile(scores,10):.4f}  "
                 f"p50={np.percentile(scores,50):.4f}  "
                 f"p90={np.percentile(scores,90):.4f}  "
                 f"p99={np.percentile(scores,99):.4f}"
@@ -162,18 +165,12 @@ for epoch in range(epoch_num):
             summarize_scores("normal_test", scores_n, f)
             summarize_scores("attack_test", scores_a, f)
 
-            # 합쳐서 AUROC/PR
-            from sklearn.metrics import roc_auc_score, average_precision_score
-            scores_all = np.concatenate([scores_n, scores_a])
-            labels_all = np.concatenate([labels_n, labels_a])  # attack=1이어야 함
-            write_and_print(f, f"AUROC: {roc_auc_score(labels_all, scores_all):.6f}")
-            write_and_print(f, f"AUPRC: {average_precision_score(labels_all, scores_all):.6f}")
-
-            # threshold 예시: normal_train(or normal_test)의 99%를 임계값으로
-            thr = np.percentile(scores_n_train, 99)
-            write_and_print(f, f"threshold(p99 of normal_test): {thr:.6f}")
-            write_and_print(f, f"attack detection rate @thr: {(scores_a > thr).mean():.6f}")
-            write_and_print(f, f"false positive rate @thr: {(scores_n > thr).mean():.6f}")
+            # threshold 예시: normal_train(or normal_test)의 1%를 임계값으로
+            thr = np.percentile(scores_n_train, 1)
+            write_and_print(f, f"threshold(p1 of normal_train): {thr:.6f}")
+            write_and_print(f, f"attack detection rate @thr: {(scores_a < thr).mean():.6f}")
+            write_and_print(f, f"false positive rate @thr: {(scores_n < thr).mean():.6f}")
             write_and_print(f, "-" * 80)
 
             torch.save(model.state_dict(), f"./model/customGPT/{epoch}.pt")
+
