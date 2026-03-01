@@ -39,9 +39,10 @@ cfg = customGPTConfig(
 )
 proj_layer = InputProjection(channel_num, d_model).to(device)
 model = CustomGPT(cfg).to(device)
+# model = CustomLSTM(d_model=d_model, n_layers=2, dropout=dropout).to(device)
 pooling_layer = TS2VecMaxPooling(pooling_layer_num).to(device)
-optimizers = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-criterion = hier_loss_ts2vec
+optimizers = torch.optim.Adam(list(model.parameters()) + list(proj_layer.parameters()), lr=lr, weight_decay=weight_decay)
+criterion = hier_loss_ts2vec_dual
 
 for epoch in range(epoch_num):
     print(f"Epoch {epoch+1}/{epoch_num}")
@@ -58,6 +59,7 @@ for epoch in range(epoch_num):
     for train_epoch in range(train_epoch_num):
         losses = []
         model.train()
+        proj_layer.train()
         for x, y, ts in tqdm(normal_train_dataloader):
             x = x.to(device) # (B, T, C)
 
@@ -132,12 +134,15 @@ for epoch in range(epoch_num):
         # score by lastmask
         scores_n_train, labels_n_train = score_by_masking(
             model, proj_layer, pooling_layer, normal_train_dataloader, device, masking_len=masking_len,
+            progress=0.2,
         )
         scores_n, labels_n = score_by_masking(
             model, proj_layer, pooling_layer, normal_test_dataloader, device, masking_len=masking_len,
+            progress=1.0,
         )
         scores_a, labels_a = score_by_masking(
             model, proj_layer, pooling_layer, attack_dataloader, device, masking_len=masking_len,
+            progress=1.0,
         )
 
         def summarize_scores(name, scores, f):
