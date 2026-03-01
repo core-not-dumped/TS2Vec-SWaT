@@ -2,7 +2,11 @@ from datetime import datetime
 
 from tqdm import tqdm
 
+from model.inputProjection import *
+from model.pooling import *
 from model.customGPT import *
+from model.customLSTM import *
+from model.customDilatedCNN import *
 from model.loss import *
 from data.dataset import *
 from data.augmentation import *
@@ -55,7 +59,7 @@ for epoch in range(epoch_num):
         losses = []
         model.train()
         for x, y, ts in tqdm(normal_train_dataloader):
-            x = x.to(device)
+            x = x.to(device) # (B, T, C)
 
             # data augmentation
             x1, x2 = augment_view_return2(x, data_len) # (B, data_len, C)
@@ -65,12 +69,12 @@ for epoch in range(epoch_num):
             x2 = proj_layer(x2) # (B, data_len, d_model)
 
             # Timestamp Masking
-            x1 = timestamp_masking(x1, masking_ratio)
-            x2 = timestamp_masking(x2, masking_ratio)
+            x1 = timestamp_masking(x1, masking_ratio) # (B, data_len, d_model)
+            x2 = timestamp_masking(x2, masking_ratio) # (B, data_len, d_model)
 
             # Dilated Convolution (Transformer, LSTM, CNN..., main model)
-            out1 = model(x1)
-            out2 = model(x2)
+            out1 = model(x1) # (B, data_len, d_model)
+            out2 = model(x2) # (B, data_len, d_model)
 
             # pooling layer
             outs1 = pooling_layer(out1)

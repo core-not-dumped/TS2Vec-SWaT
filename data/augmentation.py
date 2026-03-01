@@ -28,11 +28,10 @@ def augment_view_return2(x: torch.Tensor, data_len: int):
 
 
 def timestamp_masking(x: torch.Tensor, masking_ratio: float):
-    # x: (B, T, D)
+    # x: (B, data_len, D)
     B, T, D = x.shape
-    p_keep = 1.0 - masking_ratio
     mask = (torch.rand(B, T, device=x.device) > masking_ratio).float()
-    x = x * mask.unsqueeze(-1)
+    x = x * mask.unsqueeze(-1) # (B, data_len, D)
     return x
 
 

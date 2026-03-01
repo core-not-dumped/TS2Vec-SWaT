@@ -131,31 +131,5 @@ class CustomGPT(nn.Module):
         h = self.ln_f(h)          # (B, T, D)
         z = self.out_proj(h)
         return z
-    
-
-class InputProjection(nn.Module):
-    def __init__(self, input_dim: int, proj_dim: int = 64):
-        super().__init__()
-        # TS2Vec: per-timestamp fully connected layer
-        self.proj = nn.Linear(input_dim, proj_dim, bias=True)
-
-    def forward(self, x):  # x: (B, T, F)
-        return self.proj(x)  # (B, T, proj_dim)
 
 
-class TS2VecMaxPooling(nn.Module):
-    def __init__(self, n_scales: int = 6):
-        super().__init__()
-        self.n_scales = n_scales
-
-    def forward(self, h: torch.Tensor) -> torch.Tensor:
-        # h -> (B, T, D)
-        x = h.transpose(1, 2)  # (B, D, T)
-        outs = []
-        for _ in range(self.n_scales):
-            outs.append(x)
-            if x.size(-1) < 2:  break
-            x = F.max_pool1d(x, kernel_size=2, stride=2)
-
-        return outs
-    
