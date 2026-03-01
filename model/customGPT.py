@@ -110,15 +110,11 @@ class GPTBlock(nn.Module):
         x = x + self.mlp(self.ln2(x))
         return x
 
+
 class CustomGPT(nn.Module):
     def __init__(self, cfg: customGPTConfig):
         super().__init__()
         self.cfg = cfg
-
-        print(cfg.in_channels)
-        self.in_proj = nn.Linear(cfg.in_channels, cfg.d_model)
-        self.drop = nn.Dropout(cfg.dropout)
-
         self.blocks = nn.ModuleList([
             GPTBlock(cfg.d_model, cfg.n_heads, cfg.dropout)
             for _ in range(cfg.n_layers)
@@ -128,9 +124,7 @@ class CustomGPT(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: (B, T, C)
-        h = self.in_proj(x)   # (B, T, D)
-        h = self.drop(h)
-
+        h = x
         for blk in self.blocks:
             h = blk(h)
 
@@ -138,6 +132,16 @@ class CustomGPT(nn.Module):
         z = self.out_proj(h)
         return z
     
+
+class InputProjection(nn.Module):
+    def __init__(self, input_dim: int, proj_dim: int = 64):
+        super().__init__()
+        # TS2Vec: per-timestamp fully connected layer
+        self.proj = nn.Linear(input_dim, proj_dim, bias=True)
+
+    def forward(self, x):  # x: (B, T, F)
+        return self.proj(x)  # (B, T, proj_dim)
+
 
 class TS2VecMaxPooling(nn.Module):
     def __init__(self, n_scales: int = 6):

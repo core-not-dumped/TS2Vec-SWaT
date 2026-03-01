@@ -86,48 +86,25 @@ def last_repr_from_model(model, pooling_layer, x):
     h = outs[-1][:, :, -1]
     return h
 
+
 @torch.no_grad()
-def score_by_sliding(model, pooling_layer, loader, device, slide_len, mask_value=0.0):
+def score_by_masking(model, proj_layer, pooling_layer, loader, device, masking_len):
     model.eval()
     scores = []
     labels = []
 
     for x, y, ts in tqdm(loader):
-        x = x.to(device)  # (B,C,T)
-        x = augment_view_return_slide(x, data_len, slide_len)
+        x = x.to(device)  # (B, C, T)
+        x_mask = augment_view_return1(x, data_len) # (B, data_len, C)
         y_np = y.detach().cpu().numpy()
 
-        # unmasked
-        r = last_repr_from_model(model, pooling_layer, x)
-        r = r.reshape(-1, slide_len, r.size(-1))  # (B, slide_len, D)
-        r = F.normalize(r, dim=-1)
-        score_matrix = r @ r.transpose(1, 2)  # (B, slide_len, slide_len)
-        s = score_matrix.sum(dim=(1, 2)) - slide_len
-        s = s / (slide_len * (slide_len - 1))
-        s = 1.0 - s
-
-        scores.append(s.detach().cpu().numpy())
-        labels.append(y_np)
-
-    scores = np.concatenate(scores, axis=0)
-    labels = np.concatenate(labels, axis=0)
-    return scores, labels
-
-
-@torch.no_grad()
-def score_by_masking(model, pooling_layer, loader, device, masking_len, mask_value=0.0):
-    model.eval()
-    scores = []
-    labels = []
-
-    for x, y, ts in tqdm(loader):
-        x = x.to(device)  # (B,C,T)
-        x_mask = augment_view_return_masking(x, data_len, masking_len)
-        y_np = y.detach().cpu().numpy()
+        # input projection
+        x = proj_layer(x) # (B, data_len, d_model)
+        x_mask = augment_view_return_masking(x, data_len, masking_len) # (B * masking_len, data_len, d_model)
 
         # unmasked
-        r = last_repr_from_model(model, pooling_layer, x)
-        r_mask = last_repr_from_model(model, pooling_layer, x_mask)
+        r = last_repr_from_model(model, pooling_layer, x) # (B, D)
+        r_mask = last_repr_from_model(model, pooling_layer, x_mask) # (B * masking_len, D)
         r_mask = r_mask.reshape(-1, masking_len, r_mask.size(-1))  # (B, masking_len, D)
 
         r = F.normalize(r, dim=-1)           # (B, D)

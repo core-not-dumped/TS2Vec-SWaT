@@ -9,22 +9,32 @@ def augment_view_return2(x: torch.Tensor, data_len: int):
     s1 = torch.randint(0, max_start + 1, (B,), device=x.device)
     s2 = torch.randint(0, max_start + 1, (B,), device=x.device)
 
-    # 벡터화 slicing: (B, crop_len) 인덱스 만들기
-    idx_base = torch.arange(data_len, device=x.device).unsqueeze(0)  # (1, crop_len)
-    idx1 = (s1.unsqueeze(1) + idx_base)  # (B, crop_len)
-    idx2 = (s2.unsqueeze(1) + idx_base)  # (B, crop_len)
+    # 벡터화 slicing: (B, data_len) 인덱스 만들기
+    idx_base = torch.arange(data_len, device=x.device).unsqueeze(0)  # (1, data_len)
+    idx1 = (s1.unsqueeze(1) + idx_base)  # (B, data_len)
+    idx2 = (s2.unsqueeze(1) + idx_base)  # (B, data_len)
 
-    # gather를 위해 (B, C, crop_len) 형태로 인덱스 확장
+    # gather를 위해 (B, C, data_len) 형태로 인덱스 확장
     idx1 = idx1.unsqueeze(1).expand(B, C, data_len)
     idx2 = idx2.unsqueeze(1).expand(B, C, data_len)
 
     x1 = x.gather(dim=2, index=idx1)
     x2 = x.gather(dim=2, index=idx2)
 
-    x1 = x1.transpose(1, 2)  # (B, crop_len, C)
-    x2 = x2.transpose(1, 2)  # (B, crop_len, C)
+    x1 = x1.transpose(1, 2)  # (B, data_len, C)
+    x2 = x2.transpose(1, 2)  # (B, data_len, C)
 
     return x1, x2
+
+
+def timestamp_masking(x: torch.Tensor, masking_ratio: float):
+    # x: (B, T, D)
+    B, T, D = x.shape
+    p_keep = 1.0 - masking_ratio
+    mask = (torch.rand(B, T, device=x.device) > masking_ratio).float()
+    x = x * mask.unsqueeze(-1)
+    return x
+
 
 def augment_view_return1(x: torch.Tensor, data_len: int):
     x = x.transpose(1, 2)  # (B, C, L)
@@ -34,14 +44,14 @@ def augment_view_return1(x: torch.Tensor, data_len: int):
     max_start = L - data_len
     s1 = torch.randint(0, max_start + 1, (B,), device=x.device)
 
-    # 벡터화 slicing: (B, crop_len) 인덱스 만들기
-    idx_base = torch.arange(data_len, device=x.device).unsqueeze(0)  # (1, crop_len)
-    idx1 = (s1.unsqueeze(1) + idx_base)  # (B, crop_len)
+    # 벡터화 slicing: (B, data_len) 인덱스 만들기
+    idx_base = torch.arange(data_len, device=x.device).unsqueeze(0)  # (1, data_len)
+    idx1 = (s1.unsqueeze(1) + idx_base)  # (B, data_len)
 
-    # gather를 위해 (B, C, crop_len) 형태로 인덱스 확장
+    # gather를 위해 (B, C, data_len) 형태로 인덱스 확장
     idx1 = idx1.unsqueeze(1).expand(B, C, data_len)
     x1 = x.gather(dim=2, index=idx1)
-    x1 = x1.transpose(1, 2)  # (B, crop_len, C)
+    x1 = x1.transpose(1, 2)  # (B, data_len, C)
 
     return x1
 
@@ -92,6 +102,6 @@ def augment_view_return_masking(x: torch.Tensor, data_len: int, masking_len: int
     t_idx = (data_len - 1 - k_idx)                              # (K,)
 
     out[:, k_idx, t_idx, :] = 0
-    out = out.reshape(B * masking_len, data_len, C)  # (B*K, data_len, C)
+    out = out.reshape(B * masking_len, data_len, C)  # (B * K, data_len, C)
 
     return out

@@ -33,6 +33,7 @@ cfg = customGPTConfig(
     n_layers=n_layers,
     dropout=dropout
 )
+proj_layer = InputProjection(channel_num, d_model).to(device)
 model = CustomGPT(cfg).to(device)
 pooling_layer = TS2VecMaxPooling(pooling_layer_num).to(device)
 optimizers = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -41,6 +42,13 @@ criterion = hier_loss_ts2vec
 for epoch in range(epoch_num):
     print(f"Epoch {epoch+1}/{epoch_num}")
     
+    # collapse/spread: pairwise cosine stats
+    sim_mean_list, sim_std_list = [], []
+    # augmentation invariance: view distance stats
+    aug_dist_mean_list, aug_dist_p90_list = [], []
+    # embedding norm stats (pre-normalize)
+    norm1_mean_list, norm2_mean_list = [], []
+
     # training
     print("Training...")
     for train_epoch in range(train_epoch_num):
@@ -50,55 +58,83 @@ for epoch in range(epoch_num):
             x = x.to(device)
 
             # data augmentation
-            x1, x2 = augment_view_return2(x, data_len)
+            x1, x2 = augment_view_return2(x, data_len) # (B, data_len, C)
 
-            # encoder 2번 forward (가중치 공유)
+            # input projection
+            x1 = proj_layer(x1) # (B, data_len, d_model)
+            x2 = proj_layer(x2) # (B, data_len, d_model)
+
+            # Timestamp Masking
+            x1 = timestamp_masking(x1, masking_ratio)
+            x2 = timestamp_masking(x2, masking_ratio)
+
+            # Dilated Convolution (Transformer, LSTM, CNN..., main model)
             out1 = model(x1)
             out2 = model(x2)
 
+            # pooling layer
             outs1 = pooling_layer(out1)
             outs2 = pooling_layer(out2)
 
+            # loss backward
             loss = criterion(outs1, outs2, tau)
-
             optimizers.zero_grad()
             loss.backward()
             optimizers.step()
 
             losses.append(loss.item())
-        print(f"Epoch {epoch} - Loss: {np.mean(losses)}")
+            with torch.no_grad():
+                # embedding norm (폭발/수축 감지)
+                n1 = outs1[-1][:,:,-1].norm(dim=-1)  # (B,)
+                n2 = outs2[-1][:,:,-1].norm(dim=-1)
+                norm1_mean_list.append(n1.mean().item())
+                norm2_mean_list.append(n2.mean().item())
+
+                # augmentation invariance (view1 vs view2)
+                z1n = F.normalize(outs1[-1][:,:,-1], dim=-1)
+                z2n = F.normalize(outs2[-1][:,:,-1], dim=-1)
+                aug_dist = 1.0 - (z1n * z2n).sum(dim=-1)  # cosine distance, (B,)
+                aug_dist_mean_list.append(aug_dist.mean().item())
+                aug_dist_p90_list.append(torch.quantile(aug_dist, 0.9).item())
+
+                # representation spread / collapse proxy:
+                # batch 내 pairwise cosine similarity 분포의 mean/std
+                # (B,B) sim matrix (대각 포함)
+                sim = z1n @ z1n.transpose(0, 1)
+                sim_mean_list.append(sim.mean().item())
+                sim_std_list.append(sim.std().item())
+
+        # epoch summary
+        loss_ep = float(np.mean(losses))
+
+        sim_mean_ep = float(np.mean(sim_mean_list))
+        sim_std_ep  = float(np.mean(sim_std_list))
+        aug_mean_ep = float(np.mean(aug_dist_mean_list))
+        aug_p90_ep  = float(np.mean(aug_dist_p90_list))
+        n1_ep       = float(np.mean(norm1_mean_list))
+        n2_ep       = float(np.mean(norm2_mean_list))
+
+        print(
+            f"TrainEpoch {train_epoch}\n"
+            f"loss={loss_ep:.6f}\n"
+            f"sim_mean={sim_mean_ep:.4f} sim_std={sim_std_ep:.4f}\n"
+            f"aug_dist_mean={aug_mean_ep:.4f} aug_dist_p90={aug_p90_ep:.4f}\n"
+            f"norm(z1)={n1_ep:.2f} norm(z2)={n2_ep:.2f}"
+        )
 
     with torch.no_grad():
         print("Evaluating...")
-        # centroid는 normal_train
-        #mu = compute_centroid(model, pooling_layer, normal_train_dataloader, device)
-
-        # normal_test, attack_test 점수
-        #scores_n, labels_n = score_by_centroid(model, pooling_layer, normal_test_dataloader, mu, device)
-        #scores_a, labels_a = score_by_centroid(model, pooling_layer, attack_dataloader, mu, device)
 
         # score by lastmask
+        scores_n_train, labels_n_train = score_by_masking(
+            model, proj_layer, pooling_layer, normal_train_dataloader, device, masking_len=masking_len,
+        )
         scores_n, labels_n = score_by_masking(
-            model, pooling_layer, normal_test_dataloader, device, masking_len=masking_len,
-            mask_value=0.0,
+            model, proj_layer, pooling_layer, normal_test_dataloader, device, masking_len=masking_len,
         )
-
         scores_a, labels_a = score_by_masking(
-            model, pooling_layer, attack_dataloader, device, masking_len=masking_len,
-            mask_value=0.0,
+            model, proj_layer, pooling_layer, attack_dataloader, device, masking_len=masking_len,
         )
-        # score by sliding
-        '''
-        scores_n, labels_n = score_by_sliding(
-            model, pooling_layer, normal_test_dataloader, device, slide_len=slide_len,
-            mask_value=0.0,
-        )
-
-        scores_a, labels_a = score_by_sliding(
-            model, pooling_layer, attack_dataloader, device, slide_len=slide_len,
-            mask_value=0.0,
-        )
-        '''
 
         def summarize_scores(name, scores, f):
             msg = (
@@ -113,6 +149,7 @@ for epoch in range(epoch_num):
 
         with open("./results.txt", "a") as f:
             write_and_print(f, f"Epoch {epoch}  |  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            summarize_scores("normal_train", scores_n_train, f)
             summarize_scores("normal_test", scores_n, f)
             summarize_scores("attack_test", scores_a, f)
 
@@ -124,9 +161,10 @@ for epoch in range(epoch_num):
             write_and_print(f, f"AUPRC: {average_precision_score(labels_all, scores_all):.6f}")
 
             # threshold 예시: normal_train(or normal_test)의 99%를 임계값으로
-            thr = np.percentile(scores_n, 99)
+            thr = np.percentile(scores_n_train, 99)
             write_and_print(f, f"threshold(p99 of normal_test): {thr:.6f}")
             write_and_print(f, f"attack detection rate @thr: {(scores_a > thr).mean():.6f}")
             write_and_print(f, f"false positive rate @thr: {(scores_n > thr).mean():.6f}")
+            write_and_print(f, "-" * 80)
 
             torch.save(model.state_dict(), f"./model/customGPT/{epoch}.pt")
