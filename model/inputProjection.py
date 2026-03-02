@@ -30,7 +30,6 @@ class InputProjection_W_TimestampMasking(nn.Module):
         for layer in (self.proj_u, self.proj_m):
             nn.init.xavier_uniform_(layer.weight)
             layer.weight.data *= 0.5
-            nn.init.zeros_(layer.bias)
 
     def forward(self, x: torch.Tensor, return_mask: bool = False, no_mask: bool = False):
         B, T, F = x.shape

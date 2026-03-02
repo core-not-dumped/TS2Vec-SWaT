@@ -223,16 +223,16 @@ def score_by_learnable_masking_random(model, proj_layer, pooling_layer, loader, 
         y_np = y.detach().cpu().numpy()
 
         # input projection
-        x = proj_layer(x, no_mask=True) # (B, data_len, d_model)
+        x_origin = proj_layer(x, no_mask=True) # (B, data_len, d_model)
         x_mask = proj_layer(x.repeat_interleave(masking_len, dim=0), no_mask=False) # (B * masking_len, data_len, d_model)
 
         # unmasked
-        r = last_repr_from_model(model, pooling_layer, x) # (B, d_model)
+        r_origin = last_repr_from_model(model, pooling_layer, x_origin) # (B, d_model)
         r_mask = last_repr_from_model(model, pooling_layer, x_mask) # (B * masking_len, d_model)
         r_mask = r_mask.reshape(-1, masking_len, r_mask.size(-1))  # (B, masking_len, d_model)
 
         # compute similarity between r and each masked version of r
-        s = (r.unsqueeze(1) - r_mask).abs().sum(dim=-1)  # (B, masking_len)
+        s = (r_origin.unsqueeze(1) - r_mask).abs().sum(dim=-1)  # (B, masking_len)
         s = s.mean(dim=-1) # (B,)
 
         scores.append(s.detach().cpu().numpy())

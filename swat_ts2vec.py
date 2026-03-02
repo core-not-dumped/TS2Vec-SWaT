@@ -1,4 +1,5 @@
 from datetime import datetime
+import os
 
 from tqdm import tqdm
 
@@ -38,9 +39,12 @@ cfg = customGPTConfig(
     dropout=dropout
 )
 proj_layer = InputProjection(channel_num, d_model).to(device)
-# model = CustomGPT(cfg).to(device)
-# model = CustomLSTM(d_model=d_model, n_layers=2, dropout=dropout).to(device)
-model = CustomDilatedCNN(d_model=d_model, n_layers=4, kernel_size=3, dropout=dropout).to(device)
+if model_name == "GPT":
+    model = CustomGPT(cfg).to(device)
+elif model_name == "LSTM":
+    model = CustomLSTM(d_model=d_model, n_layers=2, dropout=dropout).to(device)
+elif model_name == "DilatedCNN":
+    model = CustomDilatedCNN(d_model=d_model, n_layers=4, kernel_size=3, dropout=dropout).to(device)
 pooling_layer = TS2VecMaxPooling(pooling_layer_num).to(device)
 optimizers = torch.optim.Adam(list(model.parameters()) + list(proj_layer.parameters()), lr=lr, weight_decay=weight_decay)
 criterion = hier_loss_ts2vec_dual
@@ -172,5 +176,7 @@ for epoch in range(epoch_num):
             write_and_print(f, f"false positive rate @thr: {(scores_n > thr).mean():.6f}")
             write_and_print(f, "-" * 80)
 
-            torch.save(model.state_dict(), f"./model/customGPT/{epoch}.pt")
+            os.makedirs(f"./model/{model_name}", exist_ok=True)
+            torch.save(model.state_dict(), f"./model/{model_name}/{epoch}.pt")
+            torch.save(proj_layer.state_dict(), f"./model/{model_name}/{epoch}_proj.pt")
 
