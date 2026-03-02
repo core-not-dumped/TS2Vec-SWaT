@@ -104,3 +104,12 @@ def augment_view_return_masking(x: torch.Tensor, data_len: int, masking_len: int
     out = out.reshape(B * masking_len, data_len, C)  # (B * K, data_len, C)
 
     return out
+
+def augment_view_return_masking_random(x: torch.Tensor, masking_len: int):
+    # x: (B, L, C)
+    B, L, C = x.shape
+    x = x.unsqueeze(1).repeat(1, masking_len, 1, 1)
+    mask = (torch.rand(B, masking_len, L, device=x.device) > 0.3).float()
+    x = x * mask.unsqueeze(-1) # (B, data_len, D)
+    x = x.reshape(B * masking_len, L, C)
+    return x

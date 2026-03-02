@@ -81,42 +81,6 @@ def to_vec(outs):
     return z
 
 
-def compute_centroid(model, pooling_layer, loader, device):
-    model.eval()
-    zs = []
-    with torch.no_grad():
-        for x, y, ts in tqdm(loader):
-            x = x.to(device)
-            x = augment_view_return1(x, data_len)
-            out = model(x)
-            outs = pooling_layer(out)
-            z = to_vec(outs)                  # (B, D_total)
-            z = F.normalize(z, dim=-1)        # cosine 기반으로 안정
-            zs.append(z.cpu())
-    Z = torch.cat(zs, dim=0)                  # (N, D_total)
-    mu = Z.mean(dim=0, keepdim=True)          # (1, D_total)
-    mu = F.normalize(mu, dim=-1)
-    return mu
-
-
-def score_by_centroid(model, pooling_layer, loader, mu, device):
-    model.eval()
-    scores, labels = [], []
-    with torch.no_grad():
-        for x, y, ts in tqdm(loader):
-            x = x.to(device)
-            x = augment_view_return1(x, data_len)
-            out = model(x)
-            outs = pooling_layer(out)
-            z = to_vec(outs)
-            z = F.normalize(z, dim=-1)
-            sim = (z.cpu() @ mu.t()).squeeze(1)     # (B,)
-            s = (1.0 - sim)                         # 높을수록 이상
-            scores.append(s)
-            labels.append(y.cpu().float())          # 0 normal, 1 attack
-    return torch.cat(scores).numpy(), torch.cat(labels).numpy()
-
-
 def last_repr_from_model(model, pooling_layer, x):
     out = model(x)
     outs = pooling_layer(out)
@@ -124,6 +88,7 @@ def last_repr_from_model(model, pooling_layer, x):
     return h
 
 
+# masking을 오른쪽부터 하나씩 적용하면서 score 계산
 @torch.no_grad()
 def score_by_masking(model, proj_layer, pooling_layer, loader, device, masking_len, progress=1.0):
     model.eval(); proj_layer.eval()
@@ -157,83 +122,122 @@ def score_by_masking(model, proj_layer, pooling_layer, loader, device, masking_l
     return scores, labels
 
 
-def repr_at_t_multiscale(model, pooling_layer, x, t_idx: torch.Tensor):
-    out = model(x)
-    outs = pooling_layer(out)  # list of (B, D, T_s)
-
-    hs = []
-    valids = []
-    B = t_idx.size(0)
-    device = t_idx.device
-
-    for s, o in enumerate(outs):
-        # o: (B, D, T_s)
-        T_s = o.size(-1)
-        ts = torch.div(t_idx, 2 ** s, rounding_mode="floor")  # (B,)
-        valid = (ts >= 0) & (ts < T_s)                         # (B,)
-
-        # gather: (B, D)
-        # clamp는 gather 에러 방지용(어차피 valid로 마스킹)
-        ts_clamped = ts.clamp(0, T_s - 1)
-        h = o.gather(dim=2, index=ts_clamped.view(B, 1, 1).expand(B, o.size(1), 1)).squeeze(-1)
-
-        hs.append(h)
-        valids.append(valid)
-
-    return hs, valids
-
-
-def multiscale_l1_at_t(hs_u, hs_m, valids):
-    B = hs_u[0].size(0)
-    device = hs_u[0].device
-    s = torch.zeros(B, device=device)
-    cnt = torch.zeros(B, device=device)
-
-    for hu, hm, v in zip(hs_u, hs_m, valids):
-        d = (hu - hm).abs().sum(dim=-1)         # (B,)
-        s = s + d * v.float()
-        cnt = cnt + v.float()
-
-    s = s / cnt.clamp_min(1.0)
-    return s
-
-
+# masking 위치를 랜던하게 만들고 score 계산
 @torch.no_grad()
-def score_by_masking_indexed(
-    model, proj_layer, pooling_layer, loader, device, masking_len, progress=1.0
-):
+def score_by_masking_random(model, proj_layer, pooling_layer, loader, device, masking_len, progress=1.0):
     model.eval(); proj_layer.eval()
     scores, labels = [], []
     max_steps = int(len(loader) * progress)
 
     for step, (x, y, ts) in enumerate(tqdm(loader, total=max_steps)):
-        if step >= max_steps: break
-        x = x.to(device)                    # (B, C, T)
+        if step >= max_steps:   break
+        x = x.to(device)  # (B, C, T)
         x = augment_view_return1(x, data_len) # (B, data_len, C)
         y_np = y.detach().cpu().numpy()
 
-        x = proj_layer(x)                   # (B, T, D_model)  <- 네 프로젝트 출력이 이 형태라고 가정
-        x_mask = augment_view_return_masking(x, data_len, masking_len)  # (B*masking_len, T, D_model)
+        # input projection
+        x = proj_layer(x) # (B, data_len, d_model)
+        x_mask = augment_view_return_masking_random(x, masking_len) # (B * masking_len, data_len, d_model)
 
-        B, T, _ = x.shape
-        per_k = []
-        for k in range(masking_len):
-            t_idx = torch.full((B,), (T - 1 - k), device=device, dtype=torch.long)
+        # unmasked
+        r = last_repr_from_model(model, pooling_layer, x) # (B, d_model)
+        r_mask = last_repr_from_model(model, pooling_layer, x_mask) # (B * masking_len, d_model)
+        r_mask = r_mask.reshape(-1, masking_len, r_mask.size(-1))  # (B, masking_len, d_model)
 
-            # unmasked repr at that t
-            hs_u, valids = repr_at_t_multiscale(model, pooling_layer, x, t_idx)
+        # compute similarity between r and each masked version of r
+        s = (r.unsqueeze(1) - r_mask).abs().sum(dim=-1)  # (B, masking_len)
+        s = s.mean(dim=-1) # (B,)
 
-            # masked batch에서 k번째 마스크에 해당하는 샘플들만 선택:
-            # x_mask가 (B*masking_len, ...)에서 "각 샘플당 masking_len개"가 연속으로 붙어있다고 가정하면
-            x_m_k = x_mask[k::masking_len]   # (B, T, D_model)
-
-            hs_m, _ = repr_at_t_multiscale(model, pooling_layer, x_m_k, t_idx)
-
-            s_k = multiscale_l1_at_t(hs_u, hs_m, valids)  # (B,)
-            per_k.append(s_k)
-
-        s = torch.stack(per_k, dim=1).mean(dim=1)  # (B,)
         scores.append(s.detach().cpu().numpy())
         labels.append(y_np)
 
-    return np.concatenate(scores), np.concatenate(labels)
+    scores = np.concatenate(scores, axis=0)
+    labels = np.concatenate(labels, axis=0)
+    return scores, labels
+
+
+# 마지막만 마스킹하고, hierarchical 하게 L1 계산
+@torch.no_grad()
+def score_by_masking_last(model, proj_layer, pooling_layer, loader, device, progress: float = 1.0,):
+    """
+    Score = mean_s ( L1( r_s(last) , r_s_mask(last) ) )
+      where r_s(last) is the last-timestep representation at scale s.
+
+    Masking: suffix masking on the *last masking_len timesteps* of projected input x
+      x_mask[:, -masking_len:, :] = mask_value
+    """
+    model.eval()
+    proj_layer.eval()
+
+    scores, labels = [], []
+    max_steps = int(len(loader) * progress)
+
+    for step, (x, y, ts) in enumerate(tqdm(loader, total=max_steps)):
+        if step >= max_steps:   break
+        x = x.to(device)  # (B, C, T)
+        x = augment_view_return1(x, data_len)  # (B, data_len, C)
+        y_np = y.detach().cpu().numpy()
+
+        x = proj_layer(x)  # (B, data_len, d_model)
+
+        # suffix masking (last part only)
+        x_mask = x.clone()
+        x_mask[:, -1, :] = 0
+
+        # forward + multi-scale pooling
+        out = model(x)              # expected: (B, T, D) or whatever your pooling_layer expects
+        out_m = model(x_mask)
+
+        rs = pooling_layer(out)     # list of (B, D, L_s)  (based on your TS2VecMaxPooling)
+        rs_m = pooling_layer(out_m) # list of (B, D, L_s)
+
+        # hierarchical L1 on last timestep per scale
+        per_scale = []
+        S = min(len(rs), len(rs_m))
+        for s in range(S):
+            a = rs[s][:, :, -1]     # (B, D)
+            b = rs_m[s][:, :, -1]   # (B, D)
+            d = (a - b).abs().sum(dim=-1)  # (B,)
+            per_scale.append(d)
+
+        s_batch = torch.stack(per_scale, dim=0).mean(dim=0)  # (B,)
+        scores.append(s_batch.detach().cpu().numpy())
+        labels.append(y_np)
+
+    scores = np.concatenate(scores, axis=0)
+    labels = np.concatenate(labels, axis=0)
+    return scores, labels
+
+
+# masking 위치를 랜던하게 만들고 score 계산
+@torch.no_grad()
+def score_by_learnable_masking_random(model, proj_layer, pooling_layer, loader, device, masking_len, progress=1.0):
+    model.eval(); proj_layer.eval()
+    scores, labels = [], []
+    max_steps = int(len(loader) * progress)
+
+    for step, (x, y, ts) in enumerate(tqdm(loader, total=max_steps)):
+        if step >= max_steps:   break
+        x = x.to(device)  # (B, C, T)
+        x = augment_view_return1(x, data_len) # (B, data_len, C)
+        y_np = y.detach().cpu().numpy()
+
+        # input projection
+        x = proj_layer(x, no_mask=True) # (B, data_len, d_model)
+        x_mask = proj_layer(x.repeat_interleave(masking_len, dim=0), no_mask=False) # (B * masking_len, data_len, d_model)
+
+        # unmasked
+        r = last_repr_from_model(model, pooling_layer, x) # (B, d_model)
+        r_mask = last_repr_from_model(model, pooling_layer, x_mask) # (B * masking_len, d_model)
+        r_mask = r_mask.reshape(-1, masking_len, r_mask.size(-1))  # (B, masking_len, d_model)
+
+        # compute similarity between r and each masked version of r
+        s = (r.unsqueeze(1) - r_mask).abs().sum(dim=-1)  # (B, masking_len)
+        s = s.mean(dim=-1) # (B,)
+
+        scores.append(s.detach().cpu().numpy())
+        labels.append(y_np)
+
+    scores = np.concatenate(scores, axis=0)
+    labels = np.concatenate(labels, axis=0)
+    return scores, labels

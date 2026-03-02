@@ -37,7 +37,7 @@ cfg = customGPTConfig(
     n_layers=n_layers,
     dropout=dropout
 )
-proj_layer = InputProjection(channel_num, d_model).to(device)
+proj_layer = InputProjection_W_TimestampMasking(channel_num, d_model).to(device)
 # model = CustomGPT(cfg).to(device)
 # model = CustomLSTM(d_model=d_model, n_layers=2, dropout=dropout).to(device)
 model = CustomDilatedCNN(d_model=d_model, n_layers=4, kernel_size=3, dropout=dropout).to(device)
@@ -67,13 +67,9 @@ for epoch in range(epoch_num):
             # data augmentation
             x1, x2 = augment_view_return2(x, data_len) # (B, data_len, C)
 
-            # input projection
+            # pooling + timestamp masking
             x1 = proj_layer(x1) # (B, data_len, d_model)
             x2 = proj_layer(x2) # (B, data_len, d_model)
-
-            # Timestamp Masking
-            x1 = timestamp_masking(x1, masking_ratio) # (B, data_len, d_model)
-            x2 = timestamp_masking(x2, masking_ratio) # (B, data_len, d_model)
 
             # Dilated Convolution (Transformer, LSTM, CNN..., main model)
             out1 = model(x1) # (B, data_len, d_model)
@@ -133,15 +129,15 @@ for epoch in range(epoch_num):
         print("Evaluating...")
 
         # score by lastmask
-        scores_n_train, labels_n_train = score_by_masking_random(
+        scores_n_train, labels_n_train = score_by_learnable_masking_random(
             model, proj_layer, pooling_layer, normal_train_dataloader, device, masking_len=masking_len,
             progress=0.2,
         )
-        scores_n, labels_n = score_by_masking_random(
+        scores_n, labels_n = score_by_learnable_masking_random(
             model, proj_layer, pooling_layer, normal_test_dataloader, device, masking_len=masking_len,
             progress=1.0,
         )
-        scores_a, labels_a = score_by_masking_random(
+        scores_a, labels_a = score_by_learnable_masking_random(
             model, proj_layer, pooling_layer, attack_dataloader, device, masking_len=masking_len,
             progress=1.0,
         )
