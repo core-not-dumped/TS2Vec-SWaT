@@ -49,6 +49,7 @@ class InputProjection_W_TimestampMasking(nn.Module):
         return out
     
 
+# time stamp, sensor masking 둘다 적용
 class InputProjection_W_TimeSensor_Masking(nn.Module):
     def __init__(self, input_dim: int, proj_dim: int = 64, mask_prob: float = 0.3):
         super().__init__()
@@ -68,9 +69,12 @@ class InputProjection_W_TimeSensor_Masking(nn.Module):
         x = x.unsqueeze(-1) * self.W.unsqueeze(0).unsqueeze(0)  # (B, T, C, D) 
 
         if no_mask:
-            mask = torch.zeros(B, T, C, 1, device=x.device)
+            mask = torch.zeros(B, T, 1, 1, device=x.device)
         else:
-            mask = (torch.rand(B, T, C, 1, device=x.device) < self.mask_prob).to(x.dtype)
+            time_stamp_mask = (torch.rand(B, T, 1, 1, device=x.device) < self.mask_prob)
+            sensor_mask = (torch.rand(B, 1, C, 1, device=x.device) < self.mask_prob)
+            mask = time_stamp_mask | sensor_mask
+            mask = mask.to(x.dtype)  # (B, T, C, 1)
         mask_inv = 1.0 - mask
 
         xu = (x * mask_inv).sum(dim=2) # (B, T, D)
