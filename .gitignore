@@ -2,5 +2,6 @@
 /data/SWaT_split
 /data/SWaT_processed
 /model/customGPT
+/model/DilatedCNN
 __pycache__/
 *.py[cod]

@@ -798,3 +798,11 @@ threshold(p99 of normal_train): 3.739524
 attack detection rate @thr: 0.941434
 false positive rate @thr: 0.005366
 --------------------------------------------------------------------------------
+Epoch 15  |  2026-03-03 00:02:02
+[normal_train] n=14752  mean=2.9943  std=0.4527  p1=2.0822  p10=2.4468  p50=2.9661  p90=3.5754  p99=4.2097
+[normal_test] n=18448  mean=3.0429  std=0.4406  p1=2.1649  p10=2.4951  p50=3.0118  p90=3.6289  p99=4.1795
+[attack_test] n=3432  mean=11.5895  std=8.6742  p1=4.1154  p10=4.6242  p50=5.9421  p90=25.8073  p99=28.8708
+threshold(p99 of normal_train): 4.209655
+attack detection rate @thr: 0.981643
+false positive rate @thr: 0.008673
+--------------------------------------------------------------------------------
