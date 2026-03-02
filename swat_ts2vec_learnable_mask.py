@@ -38,7 +38,8 @@ cfg = customGPTConfig(
     n_layers=n_layers,
     dropout=dropout
 )
-proj_layer = InputProjection_W_TimestampMasking(channel_num, d_model).to(device)
+# proj_layer = InputProjection_W_TimestampMasking(channel_num, d_model).to(device)
+proj_layer = InputProjection_W_TimeSensor_Masking(channel_num, d_model).to(device)
 if model_name == "GPT":
     model = CustomGPT(cfg).to(device)
 elif model_name == "LSTM":
