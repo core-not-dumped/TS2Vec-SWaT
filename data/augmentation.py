@@ -1,3 +1,5 @@
+from typing import Dict, Dict, Optional, Tuple
+
 import torch
 
 def augment_view_return2(x: torch.Tensor, data_len: int):
@@ -113,3 +115,117 @@ def augment_view_return_masking_random(x: torch.Tensor, masking_len: int):
     x = x * mask.unsqueeze(-1) # (B, data_len, D)
     x = x.reshape(B * masking_len, L, C)
     return x
+
+
+@torch.no_grad()
+def augment_anomaly(
+    x: torch.Tensor,                       # (B,T,C)
+    p_sample: float = 0.5,                 # 배치에서 몇 % 샘플에 이상 넣을지
+    t_frac_range: Tuple[float, float] = (0.05, 0.2),  # 이상 구간 길이 비율
+    k_sensor_range: Tuple[int, int] = (1, 5),         # 이상 센서 개수 범위
+    mode_probs: Dict[str, float] = None,   # 이상 타입 확률
+    severity: float = 3.0,                 # 이상 강도(대략 z-score 스케일로 쓰기 좋음)
+    baseline: str = "per_sample",          # "per_sample" | "global"
+    return_mask: bool = True,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
+    """
+    Returns:
+      x_corrupt: (B,T,C)
+      y_anom:    (B,T)   (샘플별 시간 이상 라벨; 옵션)
+      mask_anom: (B,T,C) (어느 (t,c)에 주입했는지; 옵션)
+    """
+    if mode_probs is None:
+        mode_probs = {
+            "spike": 0.25,
+            "step":  0.20,
+            "drift": 0.20,
+            "noise": 0.20,
+            "drop":  0.15,
+        }
+
+    device = x.device
+    B, T, C = x.shape
+    x0 = x.clone()
+
+    # robust scale estimate (배치별/샘플별 스케일)
+    if baseline == "per_sample":
+        mu = x0.mean(dim=1, keepdim=True)                 # (B,1,C)
+        sigma = x0.std(dim=1, keepdim=True).clamp_min(1e-6)
+    else:
+        mu = x0.mean(dim=(0, 1), keepdim=True)            # (1,1,C)
+        sigma = x0.std(dim=(0, 1), keepdim=True).clamp_min(1e-6)
+
+    # 어떤 샘플에 이상 넣을지
+    do = (torch.rand(B, device=device) < p_sample)        # (B,)
+    if not do.any():
+        if return_mask:
+            return x0, torch.zeros(B, T, device=device), torch.zeros(B, T, C, device=device)
+        return x0, None, None
+
+    # 이상 타입 샘플링 준비
+    modes = list(mode_probs.keys())
+    probs = torch.tensor([mode_probs[m] for m in modes], device=device)
+    probs = probs / probs.sum()
+
+    mask_anom = torch.zeros(B, T, C, device=device)
+    y_anom = torch.zeros(B, T, device=device)
+
+    for b in range(B):
+        if not do[b]:
+            continue
+
+        # time window 선택
+        frac = torch.empty(1, device=device).uniform_(*t_frac_range).item()
+        L = max(1, int(round(T * frac)))
+        t0 = int(torch.randint(0, max(1, T - L + 1), (1,), device=device).item())
+        t1 = t0 + L
+
+        # sensor subset 선택
+        k0, k1 = k_sensor_range
+        k = int(torch.randint(k0, min(C, k1) + 1, (1,), device=device).item())
+        sensors = torch.randperm(C, device=device)[:k]
+
+        # 모드 선택
+        m = modes[int(torch.multinomial(probs, 1).item())]
+
+        # 표준화된 단위로 이상 만들기: (L,k)
+        # amp는 센서별 스케일 반영해서 severity*z 로 들어감
+        amp = (severity * sigma[b, 0, sensors])            # (k,)
+        amp = amp.view(1, -1)                              # (1,k)
+
+        if m == "spike":
+            # 구간 내 랜덤 몇 포인트만 큰 스파이크
+            num_spikes = max(1, L // 10)
+            idx = torch.randint(0, L, (num_spikes,), device=device)
+            x0[b, t0:t1, sensors] += 0.0  # no-op
+            x0[b, t0 + idx, sensors] += amp * torch.sign(torch.randn(num_spikes, k, device=device))
+
+        elif m == "step":
+            # 구간 전체에 일정 오프셋
+            direction = torch.sign(torch.randn(1, k, device=device))
+            x0[b, t0:t1, sensors] += amp * direction
+
+        elif m == "drift":
+            # 선형 드리프트
+            ramp = torch.linspace(0, 1, L, device=device).view(L, 1)
+            direction = torch.sign(torch.randn(1, k, device=device))
+            x0[b, t0:t1, sensors] += ramp * (amp * direction)
+
+        elif m == "noise":
+            # 분산 폭증
+            x0[b, t0:t1, sensors] += torch.randn(L, k, device=device) * (0.5 * amp)
+
+        elif m == "drop":
+            # flatline / dropout: 평균으로 고정
+            x0[b, t0:t1, sensors] = mu[b, 0, sensors].view(1, -1).expand(L, k)
+
+        else:
+            raise ValueError(f"Unknown mode: {m}")
+
+        # 마스크/라벨 기록
+        mask_anom[b, t0:t1, sensors] = 1.0
+        y_anom[b, t0:t1] = 1.0
+
+    if return_mask:
+        return x0, y_anom, mask_anom
+    return x0, None, None

@@ -26,15 +26,19 @@ data_loader_general_hyperparam = {
 normal_test_dataset = SWaTWindowDataset([f"./data/SWaT_processed/normal_{i}.npz" for i in range(8, 10)])
 normal_test_dataloader = torch.utils.data.DataLoader(normal_test_dataset, **data_loader_general_hyperparam)
 
-model = torch.load(f'./model/{model_name}/best.pt')
+model = torch.load(f'./model/{model_name}/10.pt')
+proj_layer = torch.load(f'./model/{model_name}/10_proj.pt')
 
 model.eval()
 proj_layer.eval()
-for x, y, ts in tqdm(normal_train_dataloader):
+for x, y, ts in tqdm(normal_test_dataloader):
     x = x.to(device) # (B, T, C)
 
     # data augmentation
-    x1, x2 = augment_view_return2(x, data_len) # (B, data_len, C)
+    x = augment_view_return1(x, data_len) # (B, data_len, C)
+    x = augment_anomaly(x, anomaly_ratio) # (B, data_len, C)
+
+
 
     # pooling + timestamp masking
     x1 = proj_layer(x1) # (B, data_len, d_model)

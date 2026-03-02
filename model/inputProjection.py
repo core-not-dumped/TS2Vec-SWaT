@@ -56,6 +56,7 @@ class InputProjection_W_TimeSensor_Masking(nn.Module):
         self.mask_prob = mask_prob
         self.W = nn.Parameter(torch.empty(input_dim, proj_dim)) # (C, D)
         self.Wm = nn.Parameter(torch.empty(input_dim, proj_dim)) # (C, D)
+        self.ln = nn.LayerNorm(proj_dim)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -81,6 +82,7 @@ class InputProjection_W_TimeSensor_Masking(nn.Module):
         xm = (self.Wm.unsqueeze(0).unsqueeze(0) * mask).sum(dim=2) # (B, T, D)
 
         out = xu + xm  # (B, T, D)
+        out = self.ln(out)
 
         if return_mask:
             return out, mask
@@ -97,5 +99,6 @@ class InputProjection_W_TimeSensor_Masking(nn.Module):
         xm = (self.Wm.unsqueeze(0).unsqueeze(0) * mask).sum(dim=2) # (B, T, D)
 
         out = xu + xm  # (B, T, D)
+        out = self.ln(out)
 
         return out

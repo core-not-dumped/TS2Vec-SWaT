@@ -174,9 +174,9 @@ for epoch in range(epoch_num):
             write_and_print(f, f"threshold(p99 of normal_train): {thr:.6f}")
             write_and_print(f, f"attack detection rate @thr: {(scores_a > thr).mean():.6f}")
             write_and_print(f, f"false positive rate @thr: {(scores_n > thr).mean():.6f}")
-            write_and_print(f, "-" * 80)
 
             os.makedirs(f"./model/{model_name}", exist_ok=True)
             torch.save(model.state_dict(), f"./model/{model_name}/{epoch}.pt")
             torch.save(proj_layer.state_dict(), f"./model/{model_name}/{epoch}_proj.pt")
-
+            print(f"model saved to ./model/{model_name}/{epoch}.pt and ./model/{model_name}/{epoch}_proj.pt")
+            write_and_print(f, "-" * 80)
