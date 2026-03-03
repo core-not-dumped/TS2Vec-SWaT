@@ -130,22 +130,22 @@ def train_one_trial(
                 loss.backward()
                 optimizers.step()
 
-    model.eval()
-    proj_layer.eval()
-    with torch.no_grad():
-        scores_n_train, _ = score_by_learnable_masking_random(
-            model, proj_layer, pooling_layer, normal_train_dl, device, masking_len=masking_len, progress=0.0
-        )
-        scores_n, _ = score_by_learnable_masking_random(
-            model, proj_layer, pooling_layer, normal_test_dl, device, masking_len=masking_len, progress=0.0
-        )
-        scores_a, _ = score_by_learnable_masking_random(
-            model, proj_layer, pooling_layer, attack_dl, device, masking_len=masking_len, progress=0.0
-        )
+        model.eval()
+        proj_layer.eval()
+        with torch.no_grad():
+            scores_n_train, _ = score_by_learnable_masking_random(
+                model, proj_layer, pooling_layer, normal_train_dl, device, masking_len=masking_len, progress=0.0
+            )
+            scores_n, _ = score_by_learnable_masking_random(
+                model, proj_layer, pooling_layer, normal_test_dl, device, masking_len=masking_len, progress=0.0
+            )
+            scores_a, _ = score_by_learnable_masking_random(
+                model, proj_layer, pooling_layer, attack_dl, device, masking_len=masking_len, progress=0.0
+            )
 
-        thr = np.percentile(scores_n_train, 99)
-        attack_detection_rate = float((scores_a > thr).mean())
-        false_positive_rate = float((scores_n > thr).mean())
+            thr = np.percentile(scores_n_train, 99)
+            attack_detection_rate = float((scores_a > thr).mean())
+            false_positive_rate = float((scores_n > thr).mean())
         logger.log_val(
             threshold=thr,
             attack_detection_rate=attack_detection_rate,
