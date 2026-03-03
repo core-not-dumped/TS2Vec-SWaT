@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import math
 
 class InputProjection(nn.Module):
     def __init__(self, input_dim: int, proj_dim: int = 64):
@@ -50,13 +51,14 @@ class InputProjection_W_TimestampMasking(nn.Module):
     
 
 # time stamp, sensor masking 둘다 적용
-class InputProjection_W_TimeSensor_Masking(nn.Module):
-    def __init__(self, input_dim: int, proj_dim: int = 64, mask_prob: float = 0.3):
+class InputProjection_W_TimeSensorMasking(nn.Module):
+    def __init__(self, input_dim: int, proj_dim: int = 64, time_masking_ratio: float = 0.3, sensor_masking_ratio: float = 0.1):
         super().__init__()
-        self.mask_prob = mask_prob
+        self.time_masking_ratio = time_masking_ratio
+        self.sensor_masking_ratio = sensor_masking_ratio
         self.W = nn.Parameter(torch.empty(input_dim, proj_dim)) # (C, D)
         self.Wm = nn.Parameter(torch.empty(input_dim, proj_dim)) # (C, D)
-        self.ln = nn.LayerNorm(proj_dim)
+        self.gate = nn.Linear(proj_dim, 1, bias=True)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -70,20 +72,19 @@ class InputProjection_W_TimeSensor_Masking(nn.Module):
         x = x.unsqueeze(-1) * self.W.unsqueeze(0).unsqueeze(0)  # (B, T, C, D) 
 
         if no_mask:
-            mask = torch.zeros(B, T, 1, 1, device=x.device)
+            mask = torch.zeros(B, T, C, 1, device=x.device)
         else:
-            time_stamp_mask = (torch.rand(B, T, 1, 1, device=x.device) < self.mask_prob)
-            sensor_mask = (torch.rand(B, 1, C, 1, device=x.device) < self.mask_prob)
+            time_stamp_mask = (torch.rand(B, T, 1, 1, device=x.device) < self.time_masking_ratio)
+            sensor_mask = (torch.rand(B, 1, C, 1, device=x.device) < self.sensor_masking_ratio)
             mask = time_stamp_mask | sensor_mask
             mask = mask.to(x.dtype)  # (B, T, C, 1)
         mask_inv = 1.0 - mask
 
-        xu = (x * mask_inv).sum(dim=2) # (B, T, D)
-        xm = (self.Wm.unsqueeze(0).unsqueeze(0) * mask).sum(dim=2) # (B, T, D)
-
-        out = xu + xm  # (B, T, D)
-        out = self.ln(out)
-
+        xu = (x * mask_inv)  # (B, T, C, D)
+        xm = (self.Wm.unsqueeze(0).unsqueeze(0) * mask)  # (B, T, C, D)
+        out = xu + xm  # (B, T, C, D)
+        g = torch.sigmoid(self.gate(out.detach()))       # (B,T,C,1)
+        out = (out * g).sum(dim=2)              # 중요도 신호 살림
         if return_mask:
             return out, mask
         return out
@@ -95,10 +96,10 @@ class InputProjection_W_TimeSensor_Masking(nn.Module):
         mask[:, time, sensor_idx] = 1.0
         mask_inv = 1.0 - mask
 
-        xu = (x * mask_inv).sum(dim=2) # (B, T, D)
-        xm = (self.Wm.unsqueeze(0).unsqueeze(0) * mask).sum(dim=2) # (B, T, D)
-
-        out = xu + xm  # (B, T, D)
-        out = self.ln(out)
+        xu = (x * mask_inv)  # (B, T, C, D)
+        xm = (self.Wm.unsqueeze(0).unsqueeze(0) * mask) # (B, T, C, D)
+        out = xu + xm  # (B, T, C, D)
+        g = torch.sigmoid(self.gate(out.detach()))       # (B,T,C,1)
+        out = (out * g).sum(dim=2)              # 중요도 신호 살림
 
         return out

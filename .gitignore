@@ -3,5 +3,6 @@
 /data/SWaT_processed
 /model/customGPT
 /model/DilatedCNN
+/wandb
 __pycache__/
 *.py[cod]

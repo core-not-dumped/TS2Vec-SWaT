@@ -1,5 +1,6 @@
 from datetime import datetime
 import os
+import wandb
 
 from tqdm import tqdm
 
@@ -12,6 +13,7 @@ from model.loss import *
 from data.dataset import *
 from data.augmentation import *
 from src.hyperparam import *
+from src.callback import *
 
 def write_and_print(f, msg):
     print(msg)
@@ -31,24 +33,40 @@ attack_dataset = SWaTWindowDataset(["./data/SWaT_processed/attack_0.npz"])
 attack_dataloader = torch.utils.data.DataLoader(attack_dataset, **data_loader_general_hyperparam)
 
 channel_num = normal_train_dataset.x.shape[-1]
-cfg = customGPTConfig(
-    in_channels=channel_num,
-    d_model=d_model,
-    n_heads=n_heads,
-    n_layers=n_layers,
-    dropout=dropout
-)
-# proj_layer = InputProjection_W_TimestampMasking(channel_num, d_model).to(device)
-proj_layer = InputProjection_W_TimeSensor_Masking(channel_num, d_model).to(device)
+# proj_layer = InputProjection_W_TimestampMasking(channel_num, d_model, mask_prob=time_masking_ratio).to(device)
+proj_layer = InputProjection_W_TimeSensorMasking(channel_num, d_model, time_masking_ratio=time_masking_ratio, sensor_masking_ratio=sensor_masking_ratio).to(device)
 if model_name == "GPT":
+    cfg = customGPTConfig(
+        in_channels=channel_num,
+        d_model=d_model,
+        n_heads=n_heads,
+        n_layers=n_layers,
+        dropout=dropout
+    )
     model = CustomGPT(cfg).to(device)
 elif model_name == "LSTM":
     model = CustomLSTM(d_model=d_model, n_layers=2, dropout=dropout).to(device)
 elif model_name == "DilatedCNN":
-    model = CustomDilatedCNN(d_model=d_model, n_layers=4, kernel_size=3, dropout=dropout).to(device)
+    model = CustomDilatedCNN(d_model=d_model, n_layers=6, kernel_size=3, dropout=dropout).to(device)
 pooling_layer = TS2VecMaxPooling(pooling_layer_num).to(device)
 optimizers = torch.optim.Adam(list(model.parameters()) + list(proj_layer.parameters()), lr=lr, weight_decay=weight_decay)
 criterion = hier_loss_ts2vec_dual
+
+wandb_config = {
+    "model_name": model_name,
+    "lr": lr,
+    "batch_size": batch_size,
+    "feature_dim": d_model,
+    "mask_ratio_time": time_masking_ratio,
+    "mask_ratio_sensor": sensor_masking_ratio,
+}
+wandb.init(
+    project="ts2vec-anomaly",
+    name=", ".join(f"{k}={v}" for k, v in wandb_config.items()),
+    config=wandb_config,
+    save_code=True,
+)
+logger = WandBLogger()
 
 for epoch in range(epoch_num):
     print(f"Epoch {epoch+1}/{epoch_num}")
@@ -177,3 +195,10 @@ for epoch in range(epoch_num):
             torch.save(proj_layer.state_dict(), f"./model/{model_name}/{epoch}_proj.pt")
             print(f"model saved to ./model/{model_name}/{epoch}.pt and ./model/{model_name}/{epoch}_proj.pt")
             write_and_print(f, "-" * 80)
+        logger.log_val(
+            threshold=thr,
+            attack_detection_rate=(scores_a > thr).mean(),
+            false_positive_rate=(scores_n > thr).mean()
+        )
+
+wandb.finish()
