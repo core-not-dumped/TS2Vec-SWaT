@@ -116,6 +116,7 @@ def inject_spike_anomaly(
     amp_start: float = 1.0,
     amp_end: float = 2.0,
     dur: int = 1,            # 연속 길이(1이면 진짜 spike)
+    change_sensor_num: int = 1, # 동시에 anomaly 넣을 센서 수
 ):
     B, T, C = x.shape
     dur = max(1, min(dur, T))
@@ -129,12 +130,13 @@ def inject_spike_anomaly(
     for b in range(B):
         if not do[b]:
             continue
-        t0 = int(torch.randint(0, T - dur + 1, (1,), device=x.device).item())
-        c0 = int(torch.randint(0, C, (1,), device=x.device).item())
-        sign = -1.0 if bool(torch.rand((), device=x.device) < 0.5) else 1.0
-        amp = torch.rand((), device=x.device) * (amp_end - amp_start) + amp_start
+        for c in range(change_sensor_num):
+            t0 = int(torch.randint(0, T - dur + 1, (1,), device=x.device).item())
+            c0 = int(torch.randint(0, C, (1,), device=x.device).item())
+            sign = -1.0 if bool(torch.rand((), device=x.device) < 0.5) else 1.0
+            amp = torch.rand((), device=x.device) * (amp_end - amp_start) + amp_start
 
-        x2[b, t0:t0+dur, c0] = x2[b, t0:t0+dur, c0] + sign * amp
-        mask[b, t0:t0+dur, c0] = True
+            x2[b, t0:t0+dur, c0] = x2[b, t0:t0+dur, c0] + sign * amp
+            mask[b, t0:t0+dur, c0] = True
 
     return x2, mask, amp
