@@ -214,6 +214,7 @@ for epoch in range(epoch_num):
             false_positive_rate=(scores_n > thr).mean(),
             top_attack_percentage=topk_percentage(scores_n, scores_a)[0],
             top_normal_percentage=topk_percentage(scores_n, scores_a)[1],
+            loss_ep=loss_ep,
         )
 
 wandb.finish()

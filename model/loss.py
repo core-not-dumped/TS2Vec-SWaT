@@ -215,7 +215,7 @@ def score_by_learnable_masking_sequential(model, proj_layer, pooling_layer, load
         masked_x = x.unsqueeze(1).repeat(1, masking_len, 1, 1)
         mask = torch.ones(data_len, data_len, device=x.device).bool()
         mask.fill_diagonal_(0)
-        masked_x = (masked_x * mask[None, :, :, None]).reshape(-1, data_len, out.size(-1))
+        masked_x = (masked_x * mask[None, :, :, None]).reshape(-1, data_len, x.size(-1))
         masked_out = proj_layer(masked_x, no_mask=True)
         r_mask = last_repr_from_model(model, pooling_layer, masked_out) # (B * masking_len, d_model)
         r_mask = r_mask.reshape(-1, masking_len, r_mask.size(-1))  # (B, masking_len, d_model)

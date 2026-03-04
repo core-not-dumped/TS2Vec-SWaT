@@ -110,6 +110,7 @@ def train_one_trial(
 
     model.train()
     proj_layer.train()
+    losses = []
     for epoch in range(trial_epoch_num):
         for train_epoch in range(trial_train_epoch_num):
             for x, y, ts in tqdm(normal_train_dl):
@@ -131,7 +132,9 @@ def train_one_trial(
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(params, grad_clip)
                 optimizers.step()
+                losses.append(loss.item())
 
+        loss_ep = float(np.mean(losses))
         model.eval()
         proj_layer.eval()
         with torch.no_grad():
@@ -156,6 +159,7 @@ def train_one_trial(
             false_positive_rate=false_positive_rate,
             top_attack_percentage=top_attack_percentage,
             top_normal_percentage=top_normal_percentage,
+            loss_ep=loss_ep,
         )
 
     # (선택) 보조 지표도 저장해두면 나중에 보기 편함

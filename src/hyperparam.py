@@ -1,4 +1,4 @@
-data_window_size = 90
+data_window_size = 192
 data_stride = 15
 data_len = 64
 normal_data_cut = 10
@@ -18,6 +18,7 @@ n_heads = 4
 n_layers = 6
 dropout = 0.1
 pooling_layer_num = 7
+report_masking_len = 5
 masking_len = 20
 anomaly_ratio = 0.3
 time_masking_ratio = 0.5

@@ -116,28 +116,23 @@ def inject_spike_anomaly(
     amp_start: float = 1.0,
     amp_end: float = 2.0,
     dur: int = 1,            # 연속 길이(1이면 진짜 spike)
-    seed: int | None = None
 ):
     B, T, C = x.shape
     dur = max(1, min(dur, T))
-
-    g = torch.Generator(device=x.device)
-    if seed is not None:
-        g.manual_seed(seed)
 
     x2 = x.clone()
     mask = torch.zeros((B, T, C), device=x.device, dtype=torch.bool)
 
     # 어떤 배치에 anomaly 넣을지
-    do = torch.rand((B,), generator=g, device=x.device) < p
-
+    do = torch.rand((B,), device=x.device) < p
+    amp = None
     for b in range(B):
         if not do[b]:
             continue
-        t0 = int(torch.randint(0, T - dur + 1, (1,), generator=g, device=x.device).item())
-        c0 = int(torch.randint(0, C, (1,), generator=g, device=x.device).item())
-        sign = -1.0 if bool(torch.rand((), generator=g, device=x.device) < 0.5) else 1.0
-        amp = torch.rand((), generator=g, device=x.device) * (amp_end - amp_start) + amp_start
+        t0 = int(torch.randint(0, T - dur + 1, (1,), device=x.device).item())
+        c0 = int(torch.randint(0, C, (1,), device=x.device).item())
+        sign = -1.0 if bool(torch.rand((), device=x.device) < 0.5) else 1.0
+        amp = torch.rand((), device=x.device) * (amp_end - amp_start) + amp_start
 
         x2[b, t0:t0+dur, c0] = x2[b, t0:t0+dur, c0] + sign * amp
         mask[b, t0:t0+dur, c0] = True
