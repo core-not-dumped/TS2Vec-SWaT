@@ -6,6 +6,26 @@ import numpy as np
 from data.augmentation import *
 from src.hyperparam import *
 
+
+def topk_percentage(score_n, score_a):
+    scores = np.concatenate([score_n, score_a])
+    labels = np.concatenate([
+        np.zeros(len(score_n)),  # normal = 0
+        np.ones(len(score_a))    # attack = 1
+    ])
+
+    # score 기준 내림차순 정렬 후 top-k
+    idx = np.argsort(scores)[::-1][:len(score_a)]
+
+    attack_count = np.sum(labels[idx] == 1)
+    normal_count = np.sum(labels[idx] == 0)
+
+    attack_ratio = attack_count / len(score_a) * 100
+    normal_ratio = normal_count / len(score_a) * 100
+
+    return attack_ratio, normal_ratio
+
+
 def ts2vec_dual_loss_vec(z1: torch.Tensor, z2: torch.Tensor) -> torch.Tensor:
     B, D, L = z1.shape
     device = z1.device

@@ -14,6 +14,7 @@ from data.dataset import *
 from data.augmentation import *
 from src.hyperparam import *
 from src.callback import *
+from swat_ts2vec import write_and_print
 
 # ---- (선택) 재현성/속도용 ----
 def seed_everything(seed: int = 42):
@@ -88,7 +89,7 @@ def train_one_trial(
         channel_num, d_model, time_masking_ratio, sensor_masking_ratio
     )
 
-    optimizers = torch.optim.Adam(list(model.parameters()) + list(proj_layer.parameters()), lr=lr, weight_decay=weight_decay)
+    optimizers = torch.optim.AdamW(list(model.parameters()) + list(proj_layer.parameters()), lr=lr, weight_decay=weight_decay)
     criterion = hier_loss_ts2vec_dual
 
     wandb_config = {
@@ -134,35 +135,40 @@ def train_one_trial(
         proj_layer.eval()
         with torch.no_grad():
             scores_n_train, _ = score_by_learnable_masking_random(
-                model, proj_layer, pooling_layer, normal_train_dl, device, masking_len=masking_len, progress=0.0
+                model, proj_layer, pooling_layer, normal_train_dl, device, masking_len=masking_len, progress=0.2
             )
             scores_n, _ = score_by_learnable_masking_random(
-                model, proj_layer, pooling_layer, normal_test_dl, device, masking_len=masking_len, progress=0.0
+                model, proj_layer, pooling_layer, normal_test_dl, device, masking_len=masking_len, progress=1.0
             )
             scores_a, _ = score_by_learnable_masking_random(
-                model, proj_layer, pooling_layer, attack_dl, device, masking_len=masking_len, progress=0.0
+                model, proj_layer, pooling_layer, attack_dl, device, masking_len=masking_len, progress=1.0
             )
 
             thr = np.percentile(scores_n_train, 99)
             attack_detection_rate = float((scores_a > thr).mean())
             false_positive_rate = float((scores_n > thr).mean())
+            top_attack_percentage = topk_percentage(scores_n, scores_a)[0]
+            top_normal_percentage = topk_percentage(scores_n, scores_a)[1]
         logger.log_val(
             threshold=thr,
             attack_detection_rate=attack_detection_rate,
-            false_positive_rate=false_positive_rate
+            false_positive_rate=false_positive_rate,
+            top_attack_percentage=top_attack_percentage,
+            top_normal_percentage=top_normal_percentage,
         )
 
     # (선택) 보조 지표도 저장해두면 나중에 보기 편함
     trial.set_user_attr("thr", float(thr))
     trial.set_user_attr("fpr", false_positive_rate)
+    wandb.finish()
 
     return attack_detection_rate  # maximize 대상
 
 def objective(trial: optuna.Trial):
     # ---- search space ----
-    lr = trial.suggest_float("lr", 1e-5, 3e-3, log=True)
+    lr = trial.suggest_float("lr", 3e-5, 1e-3, log=True)
     batch_size = trial.suggest_categorical("batch_size", [8, 16, 32, 64, 128])
-    d_model = trial.suggest_categorical("d_model", [32, 64, 128, 256])
+    d_model = trial.suggest_categorical("d_model", [64, 128, 256])
     time_masking_ratio = trial.suggest_float("time_masking_ratio", 0.05, 0.6)
     sensor_masking_ratio = trial.suggest_float("sensor_masking_ratio", 0.0, 0.3)
 
@@ -195,4 +201,4 @@ def run_optuna(n_trials: int = 30, seed: int = 42):
     print("Best trial attrs:", study.best_trial.user_attrs)
     return study
 
-study = run_optuna(n_trials=30, seed=42)
+study = run_optuna(n_trials=50, seed=42)

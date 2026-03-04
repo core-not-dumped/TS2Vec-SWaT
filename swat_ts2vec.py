@@ -48,7 +48,7 @@ elif model_name == "LSTM":
 elif model_name == "DilatedCNN":
     model = CustomDilatedCNN(d_model=d_model, n_layers=4, kernel_size=3, dropout=dropout).to(device)
 pooling_layer = TS2VecMaxPooling(pooling_layer_num).to(device)
-optimizers = torch.optim.Adam(list(model.parameters()) + list(proj_layer.parameters()), lr=lr, weight_decay=weight_decay)
+optimizers = torch.optim.AdamW(list(model.parameters()) + list(proj_layer.parameters()), lr=lr, weight_decay=weight_decay)
 criterion = hier_loss_ts2vec_dual
 
 wandb_config = {
@@ -192,6 +192,8 @@ for epoch in range(epoch_num):
             write_and_print(f, f"threshold(p99 of normal_train): {thr:.6f}")
             write_and_print(f, f"attack detection rate @thr: {(scores_a > thr).mean():.6f}")
             write_and_print(f, f"false positive rate @thr: {(scores_n > thr).mean():.6f}")
+            write_and_print(f, f"top attack percentage @thr: {topk_percentage(scores_n, scores_a)[0]:.3f}")
+            write_and_print(f, f"top normal percentage @thr: {topk_percentage(scores_n, scores_a)[1]:.3f}")
 
             os.makedirs(f"./model/{model_name}", exist_ok=True)
             torch.save(model.state_dict(), f"./model/{model_name}/{epoch}.pt")
@@ -201,7 +203,9 @@ for epoch in range(epoch_num):
             logger.log_val(
                 threshold=thr,
                 attack_detection_rate=(scores_a > thr).mean(),
-                false_positive_rate=(scores_n > thr).mean()
+                false_positive_rate=(scores_n > thr).mean(),
+                top_attack_percentage=topk_percentage(scores_n, scores_a)[0],
+                top_normal_percentage=topk_percentage(scores_n, scores_a)[1],
             )
 
 wandb.finish()
