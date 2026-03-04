@@ -21,6 +21,6 @@ n_layers = 4
 dropout = 0.1
 pooling_layer_num = 7
 masking_len = 20
-masking_ratio = 0.5
+anomaly_ratio = 0.3
 time_masking_ratio = 0.3
 sensor_masking_ratio = 0.05

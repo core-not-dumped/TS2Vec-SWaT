@@ -14,7 +14,6 @@ from data.dataset import *
 from data.augmentation import *
 from src.hyperparam import *
 from src.callback import *
-from swat_ts2vec import write_and_print
 
 # ---- (선택) 재현성/속도용 ----
 def seed_everything(seed: int = 42):
@@ -116,8 +115,8 @@ def train_one_trial(
                 x = x.to(device)  # (B, T, C)
 
                 x1, x2 = augment_view_return2(x, data_len)  # (B, data_len, C)
-                x1 = proj_layer(x1)
-                x2 = proj_layer(x2)
+                x1 = proj_layer(x1, no_mask=False)
+                x2 = proj_layer(x2, no_mask=False)
 
                 out1 = model(x1)
                 out2 = model(x2)

@@ -2,23 +2,6 @@ import torch
 import torch.nn as nn
 import math
 
-class InputProjection(nn.Module):
-    def __init__(self, input_dim: int, proj_dim: int = 64):
-        super().__init__()
-        # TS2Vec: per-timestamp fully connected layer
-        self.proj = nn.Linear(input_dim, proj_dim, bias=True)
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        # Xavier init (TS2Vec에 가장 안정적)
-        nn.init.xavier_uniform_(self.proj.weight)
-        self.proj.weight.data *= 0.5
-        nn.init.zeros_(self.proj.bias)
-
-    def forward(self, x):  # x: (B, T, F)
-        return self.proj(x)  # (B, T, proj_dim)
-    
-
 class InputProjection_W_TimestampMasking(nn.Module):
     def __init__(self, input_dim: int, proj_dim: int = 64, mask_prob: float = 0.3):
         super().__init__()
@@ -32,7 +15,7 @@ class InputProjection_W_TimestampMasking(nn.Module):
             nn.init.xavier_uniform_(layer.weight)
             layer.weight.data *= 0.5
 
-    def forward(self, x: torch.Tensor, return_mask: bool = False, no_mask: bool = False):
+    def forward(self, x: torch.Tensor, no_mask: bool, return_mask: bool = False):
         B, T, F = x.shape
         if no_mask:
             mask = torch.zeros(B, T, 1, device=x.device)
@@ -67,7 +50,7 @@ class InputProjection_W_TimeSensorMasking(nn.Module):
         self.W.data *= 0.5
         self.Wm.data *= 0.5
 
-    def forward(self, x: torch.Tensor, return_mask: bool = False, no_mask: bool = False):
+    def forward(self, x: torch.Tensor, no_mask: bool, return_mask: bool = False):
         B, T, C = x.shape
         x = x.unsqueeze(-1) * self.W.unsqueeze(0).unsqueeze(0)  # (B, T, C, D) 
 

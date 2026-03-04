@@ -91,8 +91,8 @@ for epoch in range(epoch_num):
             x1, x2 = augment_view_return2(x, data_len) # (B, data_len, C)
 
             # pooling + timestamp masking
-            x1 = proj_layer(x1) # (B, data_len, d_model)
-            x2 = proj_layer(x2) # (B, data_len, d_model)
+            x1 = proj_layer(x1, no_mask=False) # (B, data_len, d_model)
+            x2 = proj_layer(x2, no_mask=False) # (B, data_len, d_model)
 
             # Dilated Convolution (Transformer, LSTM, CNN..., main model)
             out1 = model(x1) # (B, data_len, d_model)
@@ -108,6 +108,7 @@ for epoch in range(epoch_num):
             loss.backward()
 
             # gradient 확인
+            '''
             total_norm = 0
             for p in list(model.parameters()) + list(proj_layer.parameters()):
                 if p.grad is not None:
@@ -115,7 +116,8 @@ for epoch in range(epoch_num):
                     total_norm += param_norm.item() ** 2
             total_norm = total_norm ** 0.5
             print("model grad_norm:", total_norm)
-
+            '''
+            
             optimizers.step()
 
             losses.append(loss.item())
