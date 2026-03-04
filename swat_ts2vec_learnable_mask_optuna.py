@@ -65,7 +65,7 @@ def build_model_and_proj(
     elif model_name == "LSTM":
         model = CustomLSTM(d_model=d_model, n_layers=2, dropout=dropout).to(device)
     elif model_name == "DilatedCNN":
-        model = CustomDilatedCNN(d_model=d_model, n_layers=6, kernel_size=3, dropout=dropout).to(device)
+        model = CustomDilatedCNN(d_model=d_model, n_layers=n_layers, kernel_size=3, dropout=dropout).to(device)
     else:
         raise ValueError(f"Unknown model_name={model_name}")
 
@@ -88,7 +88,8 @@ def train_one_trial(
         channel_num, d_model, time_masking_ratio, sensor_masking_ratio
     )
 
-    optimizers = torch.optim.AdamW(list(model.parameters()) + list(proj_layer.parameters()), lr=lr, weight_decay=weight_decay)
+    params = list(model.parameters()) + list(proj_layer.parameters())
+    optimizers = torch.optim.AdamW(params, lr=lr, weight_decay=weight_decay)
     criterion = hier_loss_ts2vec_dual
 
     wandb_config = {
@@ -128,13 +129,14 @@ def train_one_trial(
 
                 optimizers.zero_grad()
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(params, grad_clip)
                 optimizers.step()
 
         model.eval()
         proj_layer.eval()
         with torch.no_grad():
             scores_n_train, _ = score_by_learnable_masking_random(
-                model, proj_layer, pooling_layer, normal_train_dl, device, masking_len=masking_len, progress=0.2
+                model, proj_layer, pooling_layer, normal_train_dl, device, masking_len=masking_len, progress=0.5
             )
             scores_n, _ = score_by_learnable_masking_random(
                 model, proj_layer, pooling_layer, normal_test_dl, device, masking_len=masking_len, progress=1.0

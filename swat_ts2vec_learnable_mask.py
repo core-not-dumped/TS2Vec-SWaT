@@ -47,9 +47,10 @@ if model_name == "GPT":
 elif model_name == "LSTM":
     model = CustomLSTM(d_model=d_model, n_layers=2, dropout=dropout).to(device)
 elif model_name == "DilatedCNN":
-    model = CustomDilatedCNN(d_model=d_model, n_layers=6, kernel_size=3, dropout=dropout).to(device)
+    model = CustomDilatedCNN(d_model=d_model, n_layers=n_layers, kernel_size=3, dropout=dropout).to(device)
 pooling_layer = TS2VecMaxPooling(pooling_layer_num).to(device)
-optimizers = torch.optim.AdamW(list(model.parameters()) + list(proj_layer.parameters()), lr=lr, weight_decay=weight_decay)
+params = list(model.parameters()) + list(proj_layer.parameters())
+optimizers = torch.optim.AdamW(params, lr=lr, weight_decay=weight_decay)
 criterion = hier_loss_ts2vec_dual
 
 wandb_config = {
@@ -106,6 +107,7 @@ for epoch in range(epoch_num):
             loss = criterion(outs1, outs2)
             optimizers.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(params, grad_clip)
 
             # gradient 확인
             '''
@@ -115,7 +117,7 @@ for epoch in range(epoch_num):
                     param_norm = p.grad.data.norm(2)
                     total_norm += param_norm.item() ** 2
             total_norm = total_norm ** 0.5
-            print("model grad_norm:", total_norm)
+            print(f"model grad_norm: {total_norm:.2f}")
             '''
             
             optimizers.step()
@@ -165,16 +167,13 @@ for epoch in range(epoch_num):
 
         # score by lastmask
         scores_n_train, labels_n_train = score_by_learnable_masking_random(
-            model, proj_layer, pooling_layer, normal_train_dataloader, device, masking_len=masking_len,
-            progress=0.2,
+            model, proj_layer, pooling_layer, normal_train_dataloader, device, masking_len=masking_len, progress=0.5,
         )
         scores_n, labels_n = score_by_learnable_masking_random(
-            model, proj_layer, pooling_layer, normal_test_dataloader, device, masking_len=masking_len,
-            progress=1.0,
+            model, proj_layer, pooling_layer, normal_test_dataloader, device, masking_len=masking_len, progress=1.0,
         )
         scores_a, labels_a = score_by_learnable_masking_random(
-            model, proj_layer, pooling_layer, attack_dataloader, device, masking_len=masking_len,
-            progress=1.0,
+            model, proj_layer, pooling_layer, attack_dataloader, device, masking_len=masking_len, progress=1.0,
         )
 
         def summarize_scores(name, scores, f):

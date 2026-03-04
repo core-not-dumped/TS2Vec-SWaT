@@ -1,6 +1,3 @@
-from datetime import datetime
-import os
-
 from tqdm import tqdm
 
 from model.inputProjection import *
@@ -12,6 +9,7 @@ from model.loss import *
 from data.dataset import *
 from data.augmentation import *
 from src.hyperparam import *
+from src.report import *
 
 def write_and_print(f, msg):
     print(msg)
@@ -28,16 +26,21 @@ normal_test_dataset = SWaTWindowDataset([f"./data/SWaT_processed/normal_{i}.npz"
 normal_train_dataloader = torch.utils.data.DataLoader(normal_train_dataset, **data_loader_general_hyperparam)
 normal_test_dataloader = torch.utils.data.DataLoader(normal_test_dataset, **data_loader_general_hyperparam)
 
-model = torch.load(f'./model/{model_name}/10.pt')
-proj_layer = torch.load(f'./model/{model_name}/10_proj.pt')
+channel_num = normal_train_dataset.x.shape[-1]
+model = CustomDilatedCNN(d_model=d_model, n_layers=n_layers, kernel_size=3, dropout=dropout).to(device)
+model.load_state_dict(torch.load(f"./model/{model_name}/10.pt"))
+proj_layer = InputProjection_W_TimeSensorMasking(channel_num, d_model, time_masking_ratio=time_masking_ratio, sensor_masking_ratio=sensor_masking_ratio).to(device)
+proj_layer.load_state_dict(torch.load(f"./model/{model_name}/10_proj.pt"))
 pooling_layer = TS2VecMaxPooling(pooling_layer_num).to(device)
 
 model.eval()
 proj_layer.eval()
 with torch.no_grad():
-    score, _ = score_by_learnable_masking_sequential(model, proj_layer, pooling_layer, normal_train_dataloader, device, masking_len)
+    score, _ = score_by_learnable_masking_sequential(model, proj_layer, pooling_layer, normal_train_dataloader, device, data_len)
     thr = np.percentile(score, 99)
 
+    total_anomaly_num = 0
+    total_anomaly_detected_num = 0
     for x, y, ts in tqdm(normal_test_dataloader):
         x = x.to(device) # (B, T, C)
 
@@ -57,5 +60,27 @@ with torch.no_grad():
         masked_out = masked_out.reshape(x.size(0), data_len, masked_out.size(-1)) # (B, data_len, d_model)
 
         anomaly_score = (masked_out - out.unsqueeze(1)).abs().sum(dim=-1) # (B, data_len(masking_len))
-        anomaly_score > thr
+        anomaly_sus = anomaly_score > thr # (B, data_len)
 
+        anomaly_num = anomaly_mask.sum()
+        anomaly_detected_num = (anomaly_mask.sum(-1) == anomaly_sus).sum()
+        total_anomaly_num += anomaly_num.item()
+        total_anomaly_detected_num += anomaly_detected_num.item()
+        print(f"\
+            anomaly num: {anomaly_num},\
+            detected anomaly num: {anomaly_detected_num},\
+            detection rate: {anomaly_detected_num / anomaly_num:.4f}\
+        ")
+
+        real_report = get_timewise_report(anomaly_mask, ts)
+        for r in real_report:    print(r)
+        model_report = get_timewise_report(anomaly_sus, ts)
+        for r in model_report:   print(r)
+    with open("./report.txt", "a") as f:
+        write_and_print(f, f"\
+            total anomaly num: {total_anomaly_num},\n\
+            total detected anomaly num: {total_anomaly_detected_num},\n\
+            detection rate: {total_anomaly_detected_num / total_anomaly_num:.4f}\n\
+        ")
+        write_and_print(f, "-" * 50)
+        

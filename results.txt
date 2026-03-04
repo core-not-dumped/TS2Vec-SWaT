@@ -3526,3 +3526,273 @@ threshold(p99 of normal_train): 6.362931
 attack detection rate @thr: 0.710082
 false positive rate @thr: 0.004391
 --------------------------------------------------------------------------------
+Epoch 0  |  2026-03-04 20:37:25
+[normal_train] n=14752  mean=9.4637  std=1.6819  p1=6.5143  p10=7.4518  p50=9.3167  p90=11.6334  p99=14.4121
+[normal_test] n=18448  mean=10.7050  std=2.0182  p1=6.7140  p10=7.9658  p50=10.5652  p90=13.5291  p99=15.2073
+[attack_test] n=3432  mean=15.4650  std=2.8732  p1=9.3239  p10=11.0645  p50=15.9015  p90=18.8549  p99=21.3880
+threshold(p99 of normal_train): 14.412053
+attack detection rate @thr: 0.675
+false positive rate @thr: 0.039
+top attack percentage @thr: 70.513
+top normal percentage @thr: 29.487
+--------------------------------------------------------------------------------
+Epoch 1  |  2026-03-04 20:41:38
+[normal_train] n=14752  mean=8.9239  std=1.1939  p1=6.3949  p10=7.4519  p50=8.8575  p90=10.4780  p99=12.0258
+[normal_test] n=18448  mean=8.8811  std=1.1823  p1=6.3479  p10=7.4649  p50=8.7891  p90=10.4282  p99=12.0933
+[attack_test] n=3432  mean=19.4655  std=3.6086  p1=10.9202  p10=14.3609  p50=19.7349  p90=23.8239  p99=27.4809
+threshold(p99 of normal_train): 12.025759
+attack detection rate @thr: 0.975
+false positive rate @thr: 0.011
+top attack percentage @thr: 96.562
+top normal percentage @thr: 3.438
+--------------------------------------------------------------------------------
+Epoch 2  |  2026-03-04 20:45:57
+[normal_train] n=14752  mean=8.8961  std=1.3365  p1=5.7641  p10=7.1640  p50=8.9290  p90=10.5181  p99=12.1269
+[normal_test] n=18448  mean=9.1667  std=1.0875  p1=6.9689  p10=7.8220  p50=9.1065  p90=10.5500  p99=12.0926
+[attack_test] n=3432  mean=20.3972  std=3.9224  p1=12.3559  p10=15.4917  p50=20.1342  p90=25.6269  p99=30.2347
+threshold(p99 of normal_train): 12.126933
+attack detection rate @thr: 0.992
+false positive rate @thr: 0.009
+top attack percentage @thr: 98.427
+top normal percentage @thr: 1.573
+--------------------------------------------------------------------------------
+Epoch 3  |  2026-03-04 20:50:20
+[normal_train] n=14752  mean=8.0735  std=1.1996  p1=5.6509  p10=6.6754  p50=7.9488  p90=9.6752  p99=11.2534
+[normal_test] n=18448  mean=7.7664  std=1.1185  p1=5.7774  p10=6.5021  p50=7.5832  p90=9.3532  p99=10.8801
+[attack_test] n=3432  mean=18.6583  std=3.8398  p1=11.1216  p10=13.9498  p50=18.3821  p90=23.6940  p99=28.8107
+threshold(p99 of normal_train): 11.253415
+attack detection rate @thr: 0.988
+false positive rate @thr: 0.005
+top attack percentage @thr: 98.368
+top normal percentage @thr: 1.632
+--------------------------------------------------------------------------------
+Epoch 4  |  2026-03-04 20:54:38
+[normal_train] n=14752  mean=8.2592  std=1.5091  p1=5.0329  p10=6.3645  p50=8.2167  p90=10.1716  p99=12.0636
+[normal_test] n=18448  mean=7.7550  std=1.4442  p1=4.9000  p10=5.9415  p50=7.6561  p90=9.6734  p99=11.4851
+[attack_test] n=3432  mean=17.9733  std=4.3250  p1=9.7213  p10=12.4938  p50=17.7048  p90=23.7105  p99=28.4523
+threshold(p99 of normal_train): 12.063558
+attack detection rate @thr: 0.923
+false positive rate @thr: 0.004
+top attack percentage @thr: 94.930
+top normal percentage @thr: 5.070
+--------------------------------------------------------------------------------
+Epoch 5  |  2026-03-04 20:58:59
+[normal_train] n=14752  mean=7.5707  std=1.1451  p1=5.2798  p10=6.1833  p50=7.5203  p90=8.9874  p99=10.7792
+[normal_test] n=18448  mean=7.3371  std=1.0561  p1=5.1997  p10=6.0130  p50=7.2865  p90=8.6872  p99=10.0693
+[attack_test] n=3432  mean=19.8673  std=4.8307  p1=10.3271  p10=13.8089  p50=19.5098  p90=26.4820  p99=31.6802
+threshold(p99 of normal_train): 10.779199
+attack detection rate @thr: 0.984
+false positive rate @thr: 0.003
+top attack percentage @thr: 98.339
+top normal percentage @thr: 1.661
+--------------------------------------------------------------------------------
+Epoch 6  |  2026-03-04 21:03:27
+[normal_train] n=14752  mean=7.0746  std=1.0427  p1=4.9349  p10=5.8403  p50=7.0120  p90=8.3761  p99=9.9693
+[normal_test] n=18448  mean=6.6318  std=0.8729  p1=4.9215  p10=5.5713  p50=6.5596  p90=7.7822  p99=8.9788
+[attack_test] n=3432  mean=18.6786  std=4.6981  p1=9.6544  p10=12.7678  p50=18.3325  p90=25.0385  p99=30.1996
+threshold(p99 of normal_train): 9.969305
+attack detection rate @thr: 0.988
+false positive rate @thr: 0.001
+top attack percentage @thr: 98.951
+top normal percentage @thr: 1.049
+--------------------------------------------------------------------------------
+Epoch 7  |  2026-03-04 21:07:56
+[normal_train] n=14752  mean=8.2796  std=1.6658  p1=5.2791  p10=6.3885  p50=8.0218  p90=10.5797  p99=12.8562
+[normal_test] n=18448  mean=7.2020  std=1.1532  p1=5.1356  p10=5.8085  p50=7.0798  p90=8.7433  p99=10.3757
+[attack_test] n=3432  mean=18.3876  std=4.2750  p1=10.1879  p10=13.0100  p50=18.2357  p90=23.9750  p99=29.9247
+threshold(p99 of normal_train): 12.856178
+attack detection rate @thr: 0.908
+false positive rate @thr: 0.000
+top attack percentage @thr: 97.990
+top normal percentage @thr: 2.010
+--------------------------------------------------------------------------------
+Epoch 8  |  2026-03-04 21:12:20
+[normal_train] n=14752  mean=7.7353  std=1.3124  p1=5.3732  p10=6.2535  p50=7.5344  p90=9.5787  p99=11.3083
+[normal_test] n=18448  mean=7.5876  std=1.3200  p1=5.3797  p10=6.0909  p50=7.3610  p90=9.4800  p99=11.4354
+[attack_test] n=3432  mean=18.5389  std=4.2989  p1=9.8463  p10=13.0556  p50=18.2473  p90=24.1728  p99=29.3346
+threshold(p99 of normal_train): 11.308290
+attack detection rate @thr: 0.969
+false positive rate @thr: 0.011
+top attack percentage @thr: 96.096
+top normal percentage @thr: 3.904
+--------------------------------------------------------------------------------
+Epoch 9  |  2026-03-04 21:16:43
+[normal_train] n=14752  mean=6.8433  std=1.0758  p1=4.5656  p10=5.6064  p50=6.7530  p90=8.2111  p99=9.7795
+[normal_test] n=18448  mean=6.8461  std=1.0416  p1=4.7378  p10=5.5510  p50=6.7698  p90=8.2264  p99=9.4890
+[attack_test] n=3432  mean=18.8173  std=5.3944  p1=8.9203  p10=12.2439  p50=18.1945  p90=26.2324  p99=32.3520
+threshold(p99 of normal_train): 9.779546
+attack detection rate @thr: 0.978
+false positive rate @thr: 0.006
+top attack percentage @thr: 97.552
+top normal percentage @thr: 2.448
+--------------------------------------------------------------------------------
+Epoch 10  |  2026-03-04 21:21:04
+[normal_train] n=14752  mean=6.9451  std=1.1876  p1=4.7689  p10=5.6330  p50=6.7737  p90=8.5148  p99=10.5720
+[normal_test] n=18448  mean=6.5145  std=0.8812  p1=4.8022  p10=5.4804  p50=6.4211  p90=7.6928  p99=8.9338
+[attack_test] n=3432  mean=19.4265  std=5.3203  p1=9.5500  p10=12.9591  p50=18.8848  p90=26.7803  p99=32.7565
+threshold(p99 of normal_train): 10.571964
+attack detection rate @thr: 0.973
+false positive rate @thr: 0.000
+top attack percentage @thr: 98.864
+top normal percentage @thr: 1.136
+--------------------------------------------------------------------------------
+Epoch 11  |  2026-03-04 21:25:39
+[normal_train] n=14752  mean=12.0944  std=4.7306  p1=4.6973  p10=6.7401  p50=10.8287  p90=19.5169  p99=23.0333
+[normal_test] n=18448  mean=9.7319  std=3.0583  p1=4.6890  p10=5.8469  p50=9.5742  p90=13.4023  p99=18.4941
+[attack_test] n=3432  mean=19.8685  std=5.6815  p1=9.5080  p10=13.0261  p50=19.2289  p90=27.6866  p99=33.9874
+threshold(p99 of normal_train): 23.033253
+attack detection rate @thr: 0.283
+false positive rate @thr: 0.000
+top attack percentage @thr: 72.348
+top normal percentage @thr: 27.652
+--------------------------------------------------------------------------------
+Epoch 12  |  2026-03-04 21:30:26
+[normal_train] n=14752  mean=7.7083  std=1.2454  p1=5.0509  p10=6.2598  p50=7.6115  p90=9.3094  p99=11.1378
+[normal_test] n=18448  mean=7.4423  std=1.0147  p1=5.2493  p10=6.1930  p50=7.3958  p90=8.7451  p99=10.0919
+[attack_test] n=3432  mean=18.9191  std=5.2288  p1=9.4890  p10=12.6162  p50=18.2010  p90=26.2888  p99=32.2647
+threshold(p99 of normal_train): 11.137764
+attack detection rate @thr: 0.959
+false positive rate @thr: 0.002
+top attack percentage @thr: 97.348
+top normal percentage @thr: 2.652
+--------------------------------------------------------------------------------
+Epoch 13  |  2026-03-04 21:35:00
+[normal_train] n=14752  mean=7.8128  std=1.2916  p1=5.1813  p10=6.2435  p50=7.7406  p90=9.4975  p99=11.1328
+[normal_test] n=18448  mean=7.7855  std=1.0770  p1=5.7438  p10=6.4744  p50=7.6957  p90=9.2075  p99=10.7673
+[attack_test] n=3432  mean=18.7912  std=5.0192  p1=9.9858  p10=12.8773  p50=18.1231  p90=25.7537  p99=32.4340
+threshold(p99 of normal_train): 11.132801
+attack detection rate @thr: 0.969
+false positive rate @thr: 0.005
+top attack percentage @thr: 96.970
+top normal percentage @thr: 3.030
+--------------------------------------------------------------------------------
+Epoch 14  |  2026-03-04 21:39:48
+[normal_train] n=14752  mean=8.5292  std=1.6824  p1=5.0916  p10=6.4452  p50=8.4522  p90=10.7800  p99=12.6632
+[normal_test] n=18448  mean=9.3786  std=1.5095  p1=6.0426  p10=7.3837  p50=9.3752  p90=11.2870  p99=13.0977
+[attack_test] n=3432  mean=19.5293  std=6.1379  p1=9.5572  p10=12.4317  p50=18.3526  p90=28.2599  p99=35.2960
+threshold(p99 of normal_train): 12.663167
+attack detection rate @thr: 0.883
+false positive rate @thr: 0.020
+top attack percentage @thr: 88.666
+top normal percentage @thr: 11.334
+--------------------------------------------------------------------------------
+Epoch 15  |  2026-03-04 21:44:32
+[normal_train] n=14752  mean=7.5735  std=1.3999  p1=4.9694  p10=5.9014  p50=7.4366  p90=9.4746  p99=11.1891
+[normal_test] n=18448  mean=7.1959  std=1.3329  p1=4.9411  p10=5.6483  p50=6.9756  p90=9.1616  p99=10.6703
+[attack_test] n=3432  mean=17.9486  std=5.1962  p1=8.8335  p10=11.6974  p50=17.2653  p90=25.3298  p99=30.9670
+threshold(p99 of normal_train): 11.189051
+attack detection rate @thr: 0.926
+false positive rate @thr: 0.003
+top attack percentage @thr: 94.639
+top normal percentage @thr: 5.361
+--------------------------------------------------------------------------------
+Epoch 0  |  2026-03-04 21:58:38
+[normal_train] n=36896  mean=11.2224  std=2.0665  p1=8.0249  p10=8.9672  p50=10.7809  p90=14.2709  p99=17.0541
+[normal_test] n=18448  mean=13.3693  std=2.1517  p1=9.1324  p10=10.3515  p50=13.4881  p90=16.1436  p99=17.9741
+[attack_test] n=3432  mean=15.5290  std=3.1810  p1=11.7959  p10=12.8113  p50=14.4419  p90=21.1349  p99=24.8584
+threshold(p99 of normal_train): 17.054123
+attack detection rate @thr: 0.203
+false positive rate @thr: 0.039
+top attack percentage @thr: 27.273
+top normal percentage @thr: 72.727
+--------------------------------------------------------------------------------
+Epoch 0  |  2026-03-04 22:07:28
+[normal_train] n=36896  mean=9.9473  std=1.5415  p1=6.9520  p10=8.1579  p50=9.7754  p90=11.9571  p99=14.1897
+[normal_test] n=18448  mean=10.3370  std=1.4798  p1=7.6458  p10=8.4722  p50=10.2554  p90=12.3386  p99=13.8477
+[attack_test] n=3432  mean=17.2990  std=4.0118  p1=9.8693  p10=11.8090  p50=17.2495  p90=22.1750  p99=27.7570
+threshold(p99 of normal_train): 14.189690
+attack detection rate @thr: 0.781
+false positive rate @thr: 0.005
+top attack percentage @thr: 82.955
+top normal percentage @thr: 17.045
+--------------------------------------------------------------------------------
+Epoch 1  |  2026-03-04 22:13:17
+[normal_train] n=36896  mean=9.9317  std=1.5662  p1=6.7328  p10=7.9644  p50=9.8238  p90=11.9966  p99=13.9229
+[normal_test] n=18448  mean=10.1596  std=1.3128  p1=7.6364  p10=8.5988  p50=10.0006  p90=12.0036  p99=13.4910
+[attack_test] n=3432  mean=24.0019  std=7.7657  p1=11.9749  p10=15.7858  p50=23.1085  p90=31.1045  p99=52.7061
+threshold(p99 of normal_train): 13.922880
+attack detection rate @thr: 0.953
+false positive rate @thr: 0.004
+top attack percentage @thr: 95.979
+top normal percentage @thr: 4.021
+--------------------------------------------------------------------------------
+Epoch 0  |  2026-03-04 22:18:28
+[normal_train] n=36896  mean=11.4471  std=2.1266  p1=7.8538  p10=8.9157  p50=11.1429  p90=14.4488  p99=16.8271
+[normal_test] n=18448  mean=12.4905  std=1.9691  p1=8.9825  p10=9.8874  p50=12.5269  p90=15.0777  p99=16.8871
+[attack_test] n=3432  mean=17.6338  std=4.2223  p1=9.6017  p10=11.1245  p50=18.7636  p90=22.3797  p99=25.1305
+threshold(p99 of normal_train): 16.827051
+attack detection rate @thr: 0.651
+false positive rate @thr: 0.011
+top attack percentage @thr: 69.639
+top normal percentage @thr: 30.361
+--------------------------------------------------------------------------------
+Epoch 1  |  2026-03-04 22:23:33
+[normal_train] n=36896  mean=11.4951  std=2.1413  p1=7.3887  p10=8.8979  p50=11.2834  p90=14.4962  p99=16.9074
+[normal_test] n=18448  mean=12.1027  std=1.8112  p1=8.6295  p10=10.1390  p50=11.7458  p90=14.7786  p99=16.9932
+[attack_test] n=3432  mean=17.6757  std=3.8077  p1=11.2779  p10=13.3978  p50=17.1048  p90=22.8521  p99=28.5492
+threshold(p99 of normal_train): 16.907402
+attack detection rate @thr: 0.521
+false positive rate @thr: 0.011
+top attack percentage @thr: 68.502
+top normal percentage @thr: 31.498
+--------------------------------------------------------------------------------
+Epoch 2  |  2026-03-04 22:28:36
+[normal_train] n=36896  mean=9.9330  std=2.1756  p1=5.8683  p10=7.2891  p50=9.6930  p90=13.0346  p99=15.3665
+[normal_test] n=18448  mean=10.8664  std=1.7892  p1=6.7991  p10=8.5324  p50=10.8877  p90=13.1533  p99=14.8711
+[attack_test] n=3432  mean=18.1535  std=5.0225  p1=8.9540  p10=12.3468  p50=17.6222  p90=24.3740  p99=33.0548
+threshold(p99 of normal_train): 15.366505
+attack detection rate @thr: 0.696
+false positive rate @thr: 0.005
+top attack percentage @thr: 79.720
+top normal percentage @thr: 20.280
+--------------------------------------------------------------------------------
+Epoch 3  |  2026-03-04 22:33:41
+[normal_train] n=36896  mean=9.1351  std=1.5166  p1=5.8827  p10=7.1921  p50=9.1041  p90=11.0685  p99=12.9386
+[normal_test] n=18448  mean=9.2780  std=1.2226  p1=6.6097  p10=7.7473  p50=9.2372  p90=10.8218  p99=12.4471
+[attack_test] n=3432  mean=20.2924  std=4.6408  p1=11.2148  p10=14.9028  p50=19.7575  p90=26.6014  p99=32.9628
+threshold(p99 of normal_train): 12.938640
+attack detection rate @thr: 0.968
+false positive rate @thr: 0.006
+top attack percentage @thr: 96.795
+top normal percentage @thr: 3.205
+--------------------------------------------------------------------------------
+Epoch 4  |  2026-03-04 22:38:35
+[normal_train] n=36896  mean=7.9279  std=1.2471  p1=5.4098  p10=6.4755  p50=7.8155  p90=9.5464  p99=11.3792
+[normal_test] n=18448  mean=8.0163  std=1.0542  p1=5.9352  p10=6.8169  p50=7.8899  p90=9.4005  p99=11.0667
+[attack_test] n=3432  mean=20.8397  std=5.1576  p1=10.7157  p10=14.7001  p50=20.2388  p90=27.7989  p99=34.9817
+threshold(p99 of normal_train): 11.379205
+attack detection rate @thr: 0.984
+false positive rate @thr: 0.006
+top attack percentage @thr: 97.990
+top normal percentage @thr: 2.010
+--------------------------------------------------------------------------------
+Epoch 5  |  2026-03-04 22:43:34
+[normal_train] n=36896  mean=8.4208  std=1.4109  p1=5.4104  p10=6.7339  p50=8.3169  p90=10.2732  p99=12.2041
+[normal_test] n=18448  mean=8.2892  std=1.0178  p1=6.1206  p10=7.0017  p50=8.2733  p90=9.5321  p99=11.0707
+[attack_test] n=3432  mean=22.4464  std=5.2424  p1=12.2222  p10=16.2545  p50=21.8831  p90=29.6618  p99=36.8775
+threshold(p99 of normal_train): 12.204113
+attack detection rate @thr: 0.990
+false positive rate @thr: 0.002
+top attack percentage @thr: 99.038
+top normal percentage @thr: 0.962
+--------------------------------------------------------------------------------
+Epoch 6  |  2026-03-04 22:48:29
+[normal_train] n=36896  mean=7.8154  std=1.3298  p1=5.2638  p10=6.2161  p50=7.7179  p90=9.4756  p99=11.5837
+[normal_test] n=18448  mean=8.4183  std=1.1862  p1=5.9454  p10=6.8771  p50=8.4260  p90=9.8239  p99=11.7597
+[attack_test] n=3432  mean=22.7414  std=5.1082  p1=12.6923  p10=16.7310  p50=22.2395  p90=29.5212  p99=36.6744
+threshold(p99 of normal_train): 11.583701
+attack detection rate @thr: 0.997
+false positive rate @thr: 0.011
+top attack percentage @thr: 98.397
+top normal percentage @thr: 1.603
+--------------------------------------------------------------------------------
+Epoch 7  |  2026-03-04 22:53:25
+[normal_train] n=36896  mean=8.4922  std=1.5176  p1=5.6638  p10=6.7029  p50=8.3193  p90=10.5379  p99=12.6225
+[normal_test] n=18448  mean=8.1966  std=1.1365  p1=5.8554  p10=6.7634  p50=8.1387  p90=9.6906  p99=11.0871
+[attack_test] n=3432  mean=23.0314  std=5.2034  p1=12.8965  p10=16.9106  p50=22.5152  p90=29.6624  p99=37.7002
+threshold(p99 of normal_train): 12.622485
+attack detection rate @thr: 0.992
+false positive rate @thr: 0.001
+top attack percentage @thr: 99.330
+top normal percentage @thr: 0.670
+--------------------------------------------------------------------------------
