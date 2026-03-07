@@ -10,6 +10,7 @@ from model.customGPT import *
 from model.customLSTM import *
 from model.customDilatedCNN import *
 from model.loss import *
+from model.calc_score import *
 from data.dataset import *
 from data.augmentation import *
 from src.hyperparam import *

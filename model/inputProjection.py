@@ -86,3 +86,20 @@ class InputProjection_W_TimeSensorMasking(nn.Module):
         out = (out * g).sum(dim=2)              # 중요도 신호 살림
 
         return out
+
+
+class no_mask_wrapper(nn.Module):
+    def __init__(self, proj_layer):
+        super().__init__()
+        self.proj_layer = proj_layer
+
+    def forward(self, x):
+        return self.proj_layer(x, no_mask=True)
+    
+class use_mask_wrapper(nn.Module):
+    def __init__(self, proj_layer):
+        super().__init__()
+        self.proj_layer = proj_layer
+
+    def forward(self, x):
+        return self.proj_layer(x, no_mask=False)

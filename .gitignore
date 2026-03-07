@@ -4,5 +4,7 @@
 /model/customGPT
 /model/DilatedCNN
 /wandb
+/export/onnx_test/models
+/export/onnx_test/target
 __pycache__/
 *.py[cod]
