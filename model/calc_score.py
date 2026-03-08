@@ -134,3 +134,54 @@ def score_by_learnable_masking_sequential(model, proj_layer, pooling_layer, load
     scores = np.concatenate(scores, axis=0)
     labels = np.concatenate(labels, axis=0)
     return scores, labels
+
+
+# 각 batch의 masking 위치를 랜덤하게 만들고 score 계산 (모든 dataloader 사용 x)
+@torch.no_grad()
+def get_anomaly_score_one(x, proj_layer, model, pooling_layer, report_masking_len):
+    out = proj_layer(x, no_mask=True) # (B, data_len, d_model)
+    out = last_repr_from_model(model, pooling_layer, out) # (B, d_model)
+    changed_out = proj_layer(x.repeat_interleave(report_masking_len, dim=0), no_mask=False) # (B * report_masking_len, data_len, d_model)
+    changed_out = last_repr_from_model(model, pooling_layer, changed_out) # (B * report_masking_len, d_model)
+    changed_out = changed_out.view(-1, report_masking_len, changed_out.size(-1)) # (B, report_masking_len, d_model)
+    anomaly_score = (changed_out - out.unsqueeze(1)).abs().sum(dim=-1) # (B, report_masking_len)
+    anomaly_score = anomaly_score.mean(dim=-1) # (B,)
+
+    return anomaly_score
+
+
+@torch.no_grad()
+def get_timewise_anomaly_score_one(x, proj_layer, model, pooling_layer, report_masking_len, data_len):
+    B, T, C = x.shape
+    fold_x = x.unfold(1, data_len, 1)
+    fold_x = fold_x.permute(0, 1, 3, 2) # (B, ~, data_len, C)
+    fold_x = fold_x.contiguous().view(-1, data_len, C) # (B * ~, data_len, C)
+    fold_out = proj_layer(fold_x, no_mask=True) # (B * ~, data_len, d_model)
+    fold_out = last_repr_from_model(model, pooling_layer, fold_out) # (B * ~, d_model)
+    fold_out = fold_out.view(B, -1, fold_out.size(-1)) # (B, ~, d_model)
+
+    masked_fold_x = fold_x.repeat_interleave(report_masking_len, dim=0) # (B * ~ * report_masking_len, data_len, C)
+    masked_fold_out = proj_layer(masked_fold_x, no_mask=False) # (B * ~ * report_masking_len, data_len, d_model)
+    masked_fold_out = last_repr_from_model(model, pooling_layer, masked_fold_out) # (B * ~ * report_masking_len, d_model)
+    masked_fold_out = masked_fold_out.view(B, -1, report_masking_len, masked_fold_out.size(-1)) # (B, ~, report_masking_len, d_model)
+
+    timestamp_anomaly_score = (masked_fold_out - fold_out.unsqueeze(2)).abs().sum(dim=-1).mean(dim=-1) # (B, ~)
+    torch.set_printoptions(threshold=float('inf'))
+    print(timestamp_anomaly_score)
+    return timestamp_anomaly_score
+
+
+# sensor를 가렸을 때 anomaly score가 얼마나 변하는지 계산
+@torch.no_grad()
+def get_sensorwise_anomaly_score_one(x: torch.Tensor, proj_layer, model, pooling_layer, time_anomaly_sus):
+    B, T, C = x.shape
+    if time_anomaly_sus.sum() == 0: time_anomaly_sus = ~time_anomaly_sus
+    x_rep = x.repeat_interleave(C, dim=0)
+    sensor_out = proj_layer(x_rep, no_mask=True) # (B * C, data_len, d_model)
+    sensor_out = last_repr_from_model(model, pooling_layer, sensor_out) # (B * C, d_model)
+    sensor_masked_out = proj_layer.sensor_mask_forward(x, time_anomaly_sus, no_mask=True) # (B * C, data_len, d_model)
+    sensor_masked_out = last_repr_from_model(model, pooling_layer, sensor_masked_out) # (B * C, d_model)
+    sensor_score = (sensor_masked_out - sensor_out).abs().sum(dim=-1) # (B * C,)
+    sensor_score = sensor_score.view(B, C) # (B, C)
+
+    return sensor_score

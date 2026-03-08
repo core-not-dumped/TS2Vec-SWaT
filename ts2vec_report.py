@@ -74,8 +74,8 @@ with torch.no_grad():
     95th percentile: 13.2665
     '''
 
-    total_anomaly_num = 0
-    total_anomaly_detected_num = 0
+    total_time_anomaly_num = 0
+    total_time_anomaly_detected_num = 0
     for x, y, ts in tqdm(normal_test_dataloader):
         x = x.to(device) # (B, T, C)
         B, T, C = x.shape
@@ -86,62 +86,47 @@ with torch.no_grad():
         x_crop_changed, anomaly_mask, amp = inject_spike_anomaly(x_crop, 0.5, amp_start=5.0, amp_end=10.0, dur=10, change_sensor_num=change_sensor_num) # (B, data_len, C)
         x[:,data_len-1:data_len*2-1,:] = x_crop_changed
 
-        # get anomaly score
-        get_anomaly_score_one(x, proj_layer, model, pooling_layer, report_masking_len)
-        crop_out = proj_layer(x_crop_changed, no_mask=True) # (B, data_len, d_model)
-        crop_out = last_repr_from_model(model, pooling_layer, crop_out) # (B, d_model)
-        crop_changed_out = proj_layer(x_crop_changed.repeat_interleave(report_masking_len, dim=0), no_mask=False) # (B * report_masking_len, data_len, d_model)
-        crop_changed_out = last_repr_from_model(model, pooling_layer, crop_changed_out) # (B * report_masking_len, d_model)
-        crop_changed_out = crop_changed_out.view(B, report_masking_len, crop_changed_out.size(-1)) # (B, report_masking_len, d_model)
-        anomaly_score = (crop_changed_out - crop_out.unsqueeze(1)).abs().sum(dim=-1) # (B, report_masking_len)
-        anomaly_score = anomaly_score.mean(dim=-1) # (B,)
-
+        # get anomaly score ouptut -> (B,)
+        anomaly_score = get_anomaly_score_one(x_crop_changed, proj_layer, model, pooling_layer, report_masking_len)
+        
         # get timestamp wise anomaly score
-        get_timewise_anomaly_score_one(x, proj_layer, model, pooling_layer, report_masking_len, warning_thr)
-        fold_x = x.unfold(1, data_len, 1)
-        fold_x = fold_x.permute(0, 1, 3, 2) # (B, ~, data_len, C)
-        fold_x = fold_x.contiguous().view(-1, data_len, channel_num) # (B * ~, data_len, C)
-        fold_out = proj_layer(fold_x, no_mask=True) # (B * ~, data_len, d_model)
-        fold_out = last_repr_from_model(model, pooling_layer, fold_out) # (B * ~, d_model)
-        fold_out = fold_out.view(B, -1, fold_out.size(-1)) # (B, ~, d_model)
-
-        masked_fold_x = fold_x.repeat_interleave(report_masking_len, dim=0) # (B * ~ * report_masking_len, data_len, C)
-        masked_fold_out = proj_layer(masked_fold_x, no_mask=False) # (B * ~ * report_masking_len, data_len, d_model)
-        masked_fold_out = last_repr_from_model(model, pooling_layer, masked_fold_out) # (B * ~ * report_masking_len, d_model)
-        masked_fold_out = masked_fold_out.view(B, -1, report_masking_len, masked_fold_out.size(-1)) # (B, ~, report_masking_len, d_model)
-
-        timestamp_anomaly_score = (masked_fold_out - fold_out.unsqueeze(2)).abs().sum(dim=-1).mean(dim=-1) # (B, ~)
-        torch.set_printoptions(threshold=float('inf'))
-        print(timestamp_anomaly_score)
-        anomaly_sus_seq = timestamp_anomaly_score > warning_thr         # (B, ~)
+        # idx, data_len - 1이 0가 오게 계산됨 output -> (B, T-data_len+1)
+        timestamp_anomaly_score = get_timewise_anomaly_score_one(x, proj_layer, model, pooling_layer, report_masking_len, data_len)
+        
         # voting을 이용한 anomaly detection
-        sus = (timestamp_anomaly_score > warning_thr).float().unsqueeze(1)                 # (B,1,W)
+        sus = (timestamp_anomaly_score > warning_thr).float().unsqueeze(1)                 # (B,1,~)
         kernel = torch.ones(1, 1, data_len, device=sus.device)          # (1,1,L)
         vote = F.conv1d(sus, kernel, padding=0).squeeze(1)              # (B,T)
         k = max(1, int(data_len * 0.85))                                # 예: 80%
-        anomaly_sus = (vote[:, :data_len] >= k)                         # (B,data_len)
+        time_anomaly_sus = (vote[:, :data_len] >= k)                    # (B,data_len)
 
-        anomaly_mask = anomaly_mask.any(dim=-1) # (B, data_len)
-        anomaly_num = anomaly_mask.sum()
-        anomaly_detected_num = ((anomaly_mask == anomaly_sus) & (anomaly_sus == 1)).sum()
-        false_anomaly_detected_num = ((anomaly_mask != anomaly_sus) & (anomaly_sus == 1)).sum()
-        total_anomaly_num += anomaly_num.item()
-        total_anomaly_detected_num += anomaly_detected_num.item()
-
-        # get sensor wise anomaly score
-        get_sensorwise_anomaly_score_one(x, proj_layer, model, pooling_layer, report_masking_len, warning_thr)
-
+        time_anomaly_num = anomaly_mask.any(dim=-1).sum()
+        time_anomaly_detected_num = ((anomaly_mask.any(dim=-1) == time_anomaly_sus) & (time_anomaly_sus == 1)).sum()
+        time_false_anomaly_detected_num = ((anomaly_mask.any(dim=-1) != time_anomaly_sus) & (time_anomaly_sus == 1)).sum()
+        total_time_anomaly_num += time_anomaly_num.item()
+        total_time_anomaly_detected_num += time_anomaly_detected_num.item()
+        
         print(
-            f"anomaly num: {anomaly_num}, \n" + 
-            f"detected anomaly num: {anomaly_detected_num}, \n" +
-            f"false anomaly detection num: {false_anomaly_detected_num}, \n" +
-            f"anomaly detection rate: {anomaly_detected_num / anomaly_num:.4f}"
+            f"time anomaly num: {time_anomaly_num}, \n" + 
+            f"time detected anomaly num: {time_anomaly_detected_num}, \n" +
+            f"time false anomaly detection num: {time_false_anomaly_detected_num}, \n" +
+            f"time anomaly detection rate: {time_anomaly_detected_num / time_anomaly_num:.4f} \n"
         )
 
-        real_report, real_anomaly_times = get_timewise_report(anomaly_mask, ts)
-        model_report, model_anomaly_times = get_timewise_report(anomaly_sus, ts)
-        for b, (r_real, t_real, r_model, t_model, a_score) in enumerate(zip(
-            real_report, real_anomaly_times, model_report, model_anomaly_times, anomaly_score
+        # get sensor wise anomaly score
+        sensor_anomaly_score = get_sensorwise_anomaly_score_one(x_crop_changed, proj_layer, model, pooling_layer, time_anomaly_sus) # (B, C)
+        sorted_score, sorted_idx = torch.sort(sensor_anomaly_score, dim=1, descending=True)
+        sensor_anomaly_contribution = sorted_score / sorted_score.sum(dim=1, keepdim=True)
+
+        real_timestamp_report, real_timestamp_anomaly_times = get_timewise_report(anomaly_mask.any(dim=-1), ts)
+        model_timestamp_report, model_timestamp_anomaly_times = get_timewise_report(time_anomaly_sus, ts)
+        model_sensor_report = get_sensorwise_report(sensor_anomaly_contribution, sorted_idx, ts, change_sensor_num)
+
+        for b, (r_t_real, t_t_real, r_t_model, t_t_model, r_s_model, a_score) in enumerate(zip(
+            real_timestamp_report, real_timestamp_anomaly_times,\
+            model_timestamp_report, model_timestamp_anomaly_times,\
+            model_sensor_report,\
+            anomaly_score
         )):
             state = "CRITICAL" if a_score >= crit_thr else \
                     "WARNING" if a_score >= warning_thr else "NORMAL"
@@ -150,18 +135,25 @@ with torch.no_grad():
             print(f'warning threshold: {warning_thr}, crit threshold: {crit_thr}')
             print(f"Anomaly_score: {a_score:.2f}, state: {state}")
             print("[Real]")
-            print(r_real)
-            print(f"Total anomaly time: {t_real}")
+            print(r_t_real)
+            print(f"Total anomaly time: {t_t_real}")
+            print(f"Anomaly sensor: {anomaly_mask[b].any(dim=0).nonzero(as_tuple=False).squeeze().tolist()}")
             print()
             print("[Model]")
-            print(r_model)
-            print(f"Total anomaly time: {t_model}")
+            print(r_t_model)
+            print(f"Total anomaly time: {t_t_model}")
+            if t_t_model:
+                print("Sensor contribution score:")
+                print(f"{r_s_model}\n")
+            else:
+                print("Sensor contribution score:")
+                print(f"{r_s_model}\n")
             print("-" * 50)
 
     with open("./report.txt", "a") as f:
         write_and_print(f, \
-            f"total anomaly num: {total_anomaly_num},\n" + 
-            f"total detected anomaly num: {total_anomaly_detected_num},\n" + \
-            f"detection rate: {total_anomaly_detected_num / total_anomaly_num:.4f}\n")
+            f"total time anomaly num: {total_time_anomaly_num},\n" + 
+            f"total time detected anomaly num: {total_time_anomaly_detected_num},\n" + \
+            f"time detection rate: {total_time_anomaly_detected_num / total_time_anomaly_num:.4f}\n")
         write_and_print(f, "-" * 50)
 

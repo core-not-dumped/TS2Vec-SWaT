@@ -86,6 +86,41 @@ class InputProjection_W_TimeSensorMasking(nn.Module):
         out = (out * g).sum(dim=2)              # 중요도 신호 살림
 
         return out
+    
+    def sensor_mask_forward(self, x: torch.Tensor, time_anomaly_sus: torch.Tensor, no_mask: bool=False):
+        B, T, C = x.shape
+        D = self.W.shape[-1]
+
+        # expand sensor dimension
+        x = x[:, None]                     # (B,1,T,C)
+        x = x.repeat(1, C, 1, 1)           # (B,C,T,C)
+
+        # project
+        x = x[..., None] * self.W[None, None, None] # (B,C,T,C,D)
+
+        # mask
+        sensor_mask = torch.eye(C, device=x.device, dtype=torch.bool)
+        sensor_mask = sensor_mask[None, :, None, :, None]       # (1,C,1,C,1)
+        time_mask = time_anomaly_sus[:, None, :, None, None]    # (B,1,T,1,1)
+        ts_mask = sensor_mask & time_mask                       # (B,C,T,C,1)
+        if no_mask:
+            mask = torch.zeros(B, C, T, C, 1, device=x.device, dtype=torch.bool)
+        else:
+            time_stamp_mask = (torch.rand(B, C, T, 1, 1, device=x.device) < self.time_masking_ratio)
+            sensor_mask = (torch.rand(B, C, 1, C, 1, device=x.device) < self.sensor_masking_ratio)
+            mask = time_stamp_mask | sensor_mask
+            mask = mask  # (B, C, T, C, 1)
+        mask = ts_mask | mask
+
+        # masked value
+        xu = x * (~mask)                                         # (B,C,T,C,D)
+        xm = self.Wm[None, None, None] * mask                     # (B,C,T,C,D)
+        out = xu + xm
+
+        # gating
+        g = torch.sigmoid(self.gate(out.detach()))                # (B,C,T,C,1)
+        out = (out * g).sum(dim=3)                                # (B,C,T,D)
+        return out.reshape(B * C, T, D)  # (B*C,T,D)
 
 
 class no_mask_wrapper(nn.Module):
