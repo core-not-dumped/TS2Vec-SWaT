@@ -37,20 +37,33 @@ def get_timewise_report(mask, ts):
 
     return report, anomaly_times
 
-def get_sensorwise_report(contribution, sorted_idx, ts, change_sensor_num):
+def get_sensorwise_report(contribution, sorted_idx, ts, change_sensor_num, sensors_name, mean, std, x_crop_changed, time_anomaly_mask):
     '''
     contribution: (B, C)
     sorted_idx: (B, C)
     ts: (B, T)
+    sensors_name: (C,)
+    mean, std: (1, C)
+    time_anomaly_mask: (B, data_len) -> if true, then the timestamp is detected as anomaly, else normal
     '''
     B, C = contribution.shape
     report = []
     for b in range(B):
         sample_report = []
         for c in range(change_sensor_num):
+            sensor_report = []
             sensor_idx = sorted_idx[b,c].item()
             contrib_score = contribution[b,c].item()
             if contrib_score < 0.05: break
-            sample_report.append(f"Sensor {sensor_idx}: contribution score {contrib_score:.4f}")
+            sensor_report.append(f"Sensor {sensors_name[sensor_idx]}: contribution score {contrib_score:.4f}")
+
+            mask = time_anomaly_mask[b] # (data_len,)
+            if mask.any():
+                x_crop = x_crop_changed[b][mask, sensor_idx]
+                mean_val = mean[0, sensor_idx].item()
+                std_val = std[0, sensor_idx].item()
+                x_crop_denorm = x_crop * std_val + mean_val
+                sensor_report.append(f"values ranged from {x_crop_denorm.min().item():.2f} to {x_crop_denorm.max().item():.2f}")
+            sample_report.append(", ".join(sensor_report))
         report.append("\n".join(sample_report))
     return report

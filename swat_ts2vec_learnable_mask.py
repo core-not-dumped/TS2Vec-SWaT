@@ -32,6 +32,9 @@ normal_test_dataset = SWaTWindowDataset([f"./data/SWaT_processed/normal_{i}.npz"
 normal_test_dataloader = torch.utils.data.DataLoader(normal_test_dataset, **data_loader_general_hyperparam)
 attack_dataset = SWaTWindowDataset(["./data/SWaT_processed/attack_0.npz"])
 attack_dataloader = torch.utils.data.DataLoader(attack_dataset, **data_loader_general_hyperparam)
+sensors_name = normal_train_dataset.sensors_name
+sensor_mean = normal_train_dataset.mean
+sensor_std = normal_train_dataset.std
 
 channel_num = normal_train_dataset.x.shape[-1]
 # proj_layer = InputProjection_W_TimestampMasking(channel_num, d_model, mask_prob=time_masking_ratio).to(device)

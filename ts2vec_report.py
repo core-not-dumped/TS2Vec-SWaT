@@ -31,6 +31,9 @@ normal_train_dataset = SWaTWindowDataset([f"./data/SWaT_processed/normal_{data_l
 normal_test_dataset = SWaTWindowDataset([f"./data/SWaT_processed/normal_{data_len * 3}_{i}.npz" for i in range(8, 10)])
 normal_train_dataloader = torch.utils.data.DataLoader(normal_train_dataset, **train_data_loader_general_hyperparam)
 normal_test_dataloader = torch.utils.data.DataLoader(normal_test_dataset, **test_data_loader_general_hyperparam)
+sensors_name = normal_train_dataset.sensors_name
+sensors_mean = normal_train_dataset.mean
+sensors_std = normal_train_dataset.std
 
 channel_num = normal_train_dataset.x.shape[-1]
 model = CustomDilatedCNN(d_model=d_model, n_layers=n_layers, kernel_size=3, dropout=dropout).to(device)
@@ -120,7 +123,7 @@ with torch.no_grad():
 
         real_timestamp_report, real_timestamp_anomaly_times = get_timewise_report(anomaly_mask.any(dim=-1), ts)
         model_timestamp_report, model_timestamp_anomaly_times = get_timewise_report(time_anomaly_sus, ts)
-        model_sensor_report = get_sensorwise_report(sensor_anomaly_contribution, sorted_idx, ts, change_sensor_num)
+        model_sensor_report = get_sensorwise_report(sensor_anomaly_contribution, sorted_idx, ts, change_sensor_num, sensors_name, sensors_mean, sensors_std, x_crop_changed, time_anomaly_sus)
 
         for b, (r_t_real, t_t_real, r_t_model, t_t_model, r_s_model, a_score) in enumerate(zip(
             real_timestamp_report, real_timestamp_anomaly_times,\
@@ -137,7 +140,8 @@ with torch.no_grad():
             print("[Real]")
             print(r_t_real)
             print(f"Total anomaly time: {t_t_real}")
-            print(f"Anomaly sensor: {anomaly_mask[b].any(dim=0).nonzero(as_tuple=False).squeeze().tolist()}")
+            real_anomaly_sensor_idx = anomaly_mask[b].any(dim=0).nonzero(as_tuple=False).squeeze().tolist()
+            print(f"Anomaly sensor: {', '.join([sensors_name[idx] for idx in real_anomaly_sensor_idx])}")
             print()
             print("[Model]")
             print(r_t_model)

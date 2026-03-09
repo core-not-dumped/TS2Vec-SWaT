@@ -32,7 +32,7 @@ def sliding_window(x, y, ts, window, stride):
 
 
 if __name__ == "__main__":
-    data_sp = "normal"  # "normal" or "attack"
+    data_sp = "attack"  # "normal" or "attack"
     data_cut = normal_data_cut if data_sp == "normal" else attack_data_cut
 
     data_dir = Path("./data/SWaT")
@@ -45,6 +45,7 @@ if __name__ == "__main__":
     ts = pd.to_datetime(df[" Timestamp"].str.strip(), format="%d/%m/%Y %I:%M:%S %p").astype(np.int64).values
     y = (df[LABEL_COL].values != "Normal").astype(np.int64) # y: "Normal" / "Attack" -> 0 / 1
     x = df.drop(columns=[LABEL_COL, ' Timestamp'] + drop_cols, errors="ignore").values.astype(np.float32)
+    sensors_name = df.drop(columns=[LABEL_COL, ' Timestamp'] + drop_cols, errors="ignore").columns.values
 
     # 정규화
     scaler = StandardScaler().fit(x)
@@ -64,9 +65,11 @@ if __name__ == "__main__":
 
         np.savez_compressed(
             out_dir / f"{data_sp}_{data_window_size}_{i}.npz",
-            x=x, y=y, ts=ts
+            x=x, y=y, ts=ts, sensors_name=sensors_name, mean=scaler.mean, std=scaler.std
         )
 
         print("x:", x.shape, "y:", y.shape, "ts:", ts.shape)
+        print(f"{sensors_name.shape = }")
+        print(f"{scaler.mean.shape = }, {scaler.std.shape = }")
 
     print("DONE")
